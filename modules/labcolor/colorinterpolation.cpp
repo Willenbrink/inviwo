@@ -72,8 +72,8 @@ ColorSpace::Cmyk InterpolateInCMYK(const ColorSpace::Cmyk& ColorA, const ColorSp
     HSV colors are encoded as three floating-point values:
 
     ColorA.h refers to the hue component of the color in the interval [0, 360].
-    ColorA.s refers to the magenta component of the color in the interval [0, 1].
-    ColorA.v refers to the yellow component of the color in the interval [0, 1].
+    ColorA.s refers to the saturation component of the color in the interval [0, 1].
+    ColorA.v refers to the value component of the color in the interval [0, 1].
 
     The interpolation parameter t is in the range [0, 1].
 */
@@ -99,8 +99,8 @@ ColorSpace::Hsv InterpolateInHSV(const ColorSpace::Hsv& ColorA, const ColorSpace
     HSV colors are encoded as three floating-point values:
 
     ColorA.h refers to the hue component of the color in the interval [0, 360].
-    ColorA.s refers to the magenta component of the color in the interval [0, 1].
-    ColorA.v refers to the yellow component of the color in the interval [0, 1].
+    ColorA.s refers to the saturation component of the color in the interval [0, 1].
+    ColorA.v refers to the value component of the color in the interval [0, 1].
 
     The interpolation parameters tValue and tSaturation are in the range [0, 1].
 */
@@ -126,8 +126,8 @@ ColorSpace::Hsv ChangeValueAndSaturation(const ColorSpace::Hsv& Color, const flo
     HSV colors are encoded as three floating-point values:
 
     ColorA.h refers to the hue component of the color in the interval [0, 360].
-    ColorA.s refers to the magenta component of the color in the interval [0, 1].
-    ColorA.v refers to the yellow component of the color in the interval [0, 1].
+    ColorA.s refers to the saturation component of the color in the interval [0, 1].
+    ColorA.v refers to the value component of the color in the interval [0, 1].
 
     The interpolation parameters tHue and tSaturation are in the range [0, 1].
 */
