@@ -48,6 +48,7 @@ void drawLineSegment(const vec2& v1, const vec2& v2, const vec4& color, IndexBuf
 
 void ConnectPoints::BoundingBox(const std::vector<vec3>& Points, IndexBufferRAM* OutIndices,
                                 Vec3BufferRAM* OutVertices) {
+    // TODO: finish this function
     drawLineSegment({0, 0}, {0, 1}, {255, 0, 0, 1}, OutIndices, OutVertices);
     drawLineSegment({0, 1}, {1, 1}, {255, 0, 0, 1}, OutIndices, OutVertices);
     drawLineSegment({1, 1}, {1, 0}, {255, 0, 0, 1}, OutIndices, OutVertices);
