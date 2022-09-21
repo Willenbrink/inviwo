@@ -24,6 +24,7 @@ const ProcessorInfo MarchingSquares::processorInfo_{
 
 const ProcessorInfo MarchingSquares::getProcessorInfo() const { return processorInfo_; }
 
+
 MarchingSquares::MarchingSquares()
     : Processor()
     , inData("volumeIn")
@@ -109,10 +110,13 @@ MarchingSquares::MarchingSquares()
     });
 }
 
+
 void MarchingSquares::process() {
     if (!inData.hasData()) {
         return;
     }
+
+    
 
     // Create a structured grid from the input volume
     auto vol = inData.getData();
@@ -228,20 +232,9 @@ void MarchingSquares::process() {
     // Initialize the output: mesh and vertices
     auto mesh = std::make_shared<BasicMesh>();
     std::vector<BasicMesh::Vertex> vertices;
-
+    auto indexBufferLines = mesh->addIndexBuffer(DrawType::Lines, ConnectivityType::None);
     LogProcessorWarn("HUH?");
-
-    if (propMultiple.get() == 0) {
-        auto indexBufferLines = mesh->addIndexBuffer(DrawType::Lines, ConnectivityType::None);
-        // TODO: Draw a single isoline at the specified isovalue (propIsoValue)
-        // and color it with the specified color (propIsoColor)
-
-        double gridSize = grid.getPositionAtVertex(vec2(1, 0)).x - grid.getPositionAtVertex(
-                              vec2(0, 0)).x;
-        double propertyIsoValue = propIsoValue.get();
-        
-        LogProcessorWarn("Grid size: " << gridSize);
-
+    auto drawIsoContour = [&](double propertyIsoValue, double gridSize, ScalarField2 grid) {
         for (int x = 0; x < grid.getNumVerticesPerDim().x - 1; x++) {
             for (int y = 0; y < grid.getNumVerticesPerDim().y - 1; y++) {
                 // LogProcessorWarn("Loop through x=" << x << ",y=" << y);
@@ -252,15 +245,15 @@ void MarchingSquares::process() {
                 double bottomLeftValue = grid.getValueAtVertex(bottomLeft);
                 double bottomRightValue = grid.getValueAtVertex(bottomRight);
                 double topLeftValue = grid.getValueAtVertex(topLeft);
-                double topRightValue = grid.getValueAtVertex(topRight);                
+                double topRightValue = grid.getValueAtVertex(topRight);
 
                 std::vector<vec2> specialPoints;
-                
+
                 double diffBottomLeft = bottomLeftValue - propertyIsoValue;
                 double diffBottomRight = bottomRightValue - propertyIsoValue;
                 double diffTopLeft = topLeftValue - propertyIsoValue;
                 double diffTopRight = topRightValue - propertyIsoValue;
-                
+
                 if (signbit(diffBottomLeft) != signbit(diffBottomRight)) {
                     double low, high;
                     bool highIsLeft;
@@ -284,7 +277,7 @@ void MarchingSquares::process() {
                     vec2 newPos = vec2(grid.getPositionAtVertex(bottomLeft).x + relative * gridSize,
                                        grid.getPositionAtVertex(bottomLeft).y);
                     specialPoints.push_back(newPos);
-                    
+
                 }
 
                 if (signbit(diffTopLeft) != signbit(diffTopRight)) {
@@ -369,20 +362,46 @@ void MarchingSquares::process() {
                 std::sort(specialPoints.begin(), specialPoints.end(), [](vec2 a, vec2 b) {
                     return a.x < b.x;
                 });
-                if(specialPoints.size() == 4 && randomValue(minRand, maxRand) > 0.5f && propDeciderType.get() == 1) {
+                if (specialPoints.size() == 4 && randomValue(minRand, maxRand) > 0.5f &&
+                    propDeciderType.get() == 1) {
                     auto tmp = specialPoints[1];
                     specialPoints[1] = specialPoints[2];
                     specialPoints[2] = tmp;
                 }
-                
+
                 for (int i = 0; i < specialPoints.size(); i += 2) {
-                    drawLineSegment(specialPoints[i], specialPoints[i+1], propIsoColor.get(), indexBufferLines.get(), vertices);
+                    drawLineSegment(specialPoints[i], specialPoints[i + 1], propIsoColor.get(),
+                                    indexBufferLines.get(), vertices);
                 }
             }
         }
+    };
+    double gridSize = grid.getPositionAtVertex(vec2(1, 0)).x - grid.getPositionAtVertex(
+                              vec2(0, 0)).x;
+
+    if (propMultiple.get() == 0) {
+        
+        // TODO: Draw a single isoline at the specified isovalue (propIsoValue)
+        // and color it with the specified color (propIsoColor)
+
+        
+        double propertyIsoValue = propIsoValue.get();
+
+        LogProcessorWarn("Grid size: " << gridSize);
+
+        drawIsoContour(propertyIsoValue, gridSize, grid);
+
     } else {
         // TODO: Draw the given number (propNumContours) of isolines between
         // the minimum and maximum value
+        int numContours = propNumContours.get();
+
+        double currentValue = minValue;
+        double increase = (maxValue - minValue) / numContours;
+        for (int i = 0; i< numContours; i++) {
+            drawIsoContour(currentValue, gridSize, grid);
+            currentValue = currentValue + increase;
+        }
 
         // TODO (Bonus): Use the transfer function property to assign a color
         // The transfer function normalizes the input data and sampling colors
@@ -402,6 +421,7 @@ void MarchingSquares::process() {
     mesh->addVertices(vertices);
     meshIsoOut.setData(mesh);
 }
+
 
 float MarchingSquares::randomValue(const float min, const float max) const {
     return min + uniformReal(randGenerator) * (max - min);
