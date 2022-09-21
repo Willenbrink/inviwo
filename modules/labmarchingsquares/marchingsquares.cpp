@@ -238,38 +238,44 @@ void MarchingSquares::process() {
 
         double gridSize = grid.getPositionAtVertex(vec2(1, 0)).x - grid.getPositionAtVertex(
                               vec2(0, 0)).x;
+        double propertyIsoValue = propIsoValue.get();
+        
         LogProcessorWarn("Grid size: " << gridSize);
 
         for (int x = 0; x < grid.getNumVerticesPerDim().x - 1; x++) {
             for (int y = 0; y < grid.getNumVerticesPerDim().y - 1; y++) {
-                LogProcessorWarn("Loop through x=" << x << ",y=" << y);
+                // LogProcessorWarn("Loop through x=" << x << ",y=" << y);
                 vec2 bottomLeft = vec2(x, y);
                 vec2 bottomRight = vec2(x + 1, y);
                 vec2 topLeft = vec2(x, y + 1);
                 vec2 topRight = vec2(x + 1, y + 1);
+                double bottomLeftValue = grid.getValueAtVertex(bottomLeft);
+                double bottomRightValue = grid.getValueAtVertex(bottomRight);
+                double topLeftValue = grid.getValueAtVertex(topLeft);
+                double topRightValue = grid.getValueAtVertex(topRight);                
 
                 std::vector<vec2> specialPoints;
                 
-                double diffBottomLeft = grid.getValueAtVertex(bottomLeft) - propIsoValue.get();
-                double diffBottomRight = grid.getValueAtVertex(bottomRight) - propIsoValue.get();
-                double diffTopLeft = grid.getValueAtVertex(topLeft) - propIsoValue.get();
-                double diffTopRight = grid.getValueAtVertex(topRight) - propIsoValue.get();
+                double diffBottomLeft = bottomLeftValue - propertyIsoValue;
+                double diffBottomRight = bottomRightValue - propertyIsoValue;
+                double diffTopLeft = topLeftValue - propertyIsoValue;
+                double diffTopRight = topRightValue - propertyIsoValue;
                 
                 if (signbit(diffBottomLeft) != signbit(diffBottomRight)) {
                     double low, high;
                     bool highIsLeft;
-                    if (grid.getValueAtVertex(bottomLeft) < grid.getValueAtVertex(bottomRight)) {
-                        low = grid.getValueAtVertex(bottomLeft);
-                        high = grid.getValueAtVertex(bottomRight);
+                    if (bottomLeftValue < bottomRightValue) {
+                        low = bottomLeftValue;
+                        high = bottomRightValue;
                         highIsLeft = false;
                     } else {
-                        high = grid.getValueAtVertex(bottomLeft);
-                        low = grid.getValueAtVertex(bottomRight);
+                        high = bottomLeftValue;
+                        low = bottomRightValue;
                         highIsLeft = true;
                     }
 
                     double diff = high - low;
-                    double middle = propIsoValue.get() - low;
+                    double middle = propertyIsoValue - low;
                     double relative = middle / diff;
                     if (highIsLeft) {
                         relative = 1 - relative;
@@ -284,18 +290,18 @@ void MarchingSquares::process() {
                 if (signbit(diffTopLeft) != signbit(diffTopRight)) {
                     double low, high;
                     bool highIsLeft;
-                    if (grid.getValueAtVertex(topLeft) < grid.getValueAtVertex(topRight)) {
-                        low = grid.getValueAtVertex(topLeft);
-                        high = grid.getValueAtVertex(topRight);
+                    if (topLeftValue < topRightValue) {
+                        low = topLeftValue;
+                        high = topRightValue;
                         highIsLeft = false;
                     } else {
-                        high = grid.getValueAtVertex(topLeft);
-                        low = grid.getValueAtVertex(topRight);
+                        high = topLeftValue;
+                        low = topRightValue;
                         highIsLeft = true;
                     }
 
                     double diff = high - low;
-                    double middle = propIsoValue.get() - low;
+                    double middle = propertyIsoValue - low;
                     double relative = middle / diff;
                     if (highIsLeft) {
                         relative = 1 - relative;
@@ -310,18 +316,18 @@ void MarchingSquares::process() {
                 if (signbit(diffBottomLeft) != signbit(diffTopLeft)) {
                     double low, high;
                     bool highIsTop;
-                    if (grid.getValueAtVertex(bottomLeft) < grid.getValueAtVertex(topLeft)) {
-                        low = grid.getValueAtVertex(bottomLeft);
-                        high = grid.getValueAtVertex(topLeft);
+                    if (bottomLeftValue < topLeftValue) {
+                        low = bottomLeftValue;
+                        high = topLeftValue;
                         highIsTop = false;
                     } else {
-                        high = grid.getValueAtVertex(bottomLeft);
-                        low = grid.getValueAtVertex(topLeft);
+                        high = bottomLeftValue;
+                        low = topLeftValue;
                         highIsTop = true;
                     }
 
                     double diff = high - low;
-                    double middle = propIsoValue.get() - low;
+                    double middle = propertyIsoValue - low;
                     double relative = middle / diff;
                     if (highIsTop) {
                         relative = 1 - relative;
@@ -331,24 +337,23 @@ void MarchingSquares::process() {
                                        grid.getPositionAtVertex(
                                            bottomLeft).y + relative * gridSize);
                     specialPoints.push_back(newPos);
-
                 }
 
                 if (signbit(diffBottomRight) != signbit(diffTopRight)) {
                     double low, high;
                     bool highIsTop;
-                    if (grid.getValueAtVertex(bottomRight) < grid.getValueAtVertex(topRight)) {
-                        low = grid.getValueAtVertex(bottomRight);
-                        high = grid.getValueAtVertex(topRight);
+                    if (bottomRightValue < topRightValue) {
+                        low = bottomRightValue;
+                        high = topRightValue;
                         highIsTop = false;
                     } else {
-                        high = grid.getValueAtVertex(bottomRight);
-                        low = grid.getValueAtVertex(topRight);
+                        high = bottomRightValue;
+                        low = topRightValue;
                         highIsTop = true;
                     }
 
                     double diff = high - low;
-                    double middle = propIsoValue.get() - low;
+                    double middle = propertyIsoValue - low;
                     double relative = middle / diff;
                     if (highIsTop) {
                         relative = 1 - relative;
@@ -369,7 +374,8 @@ void MarchingSquares::process() {
                     specialPoints[1] = specialPoints[2];
                     specialPoints[2] = tmp;
                 }
-                for(int i = 0; i < specialPoints.size(); i += 2) {
+                
+                for (int i = 0; i < specialPoints.size(); i += 2) {
                     drawLineSegment(specialPoints[i], specialPoints[i+1], propIsoColor.get(), indexBufferLines.get(), vertices);
                 }
             }
