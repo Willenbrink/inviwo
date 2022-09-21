@@ -15,11 +15,11 @@ namespace inviwo {
 
 // The Class Identifier has to be globally unique. Use a reverse DNS naming scheme
 const ProcessorInfo MarchingSquares::processorInfo_{
-    "org.inviwo.MarchingSquares",  // Class identifier
-    "Marching Squares",            // Display name
-    "KTH Lab",                     // Category
-    CodeState::Experimental,       // Code state
-    Tags::None,                    // Tags
+    "org.inviwo.MarchingSquares", // Class identifier
+    "Marching Squares",           // Display name
+    "KTH Lab",                    // Category
+    CodeState::Experimental,      // Code state
+    Tags::None,                   // Tags
 };
 
 const ProcessorInfo MarchingSquares::getProcessorInfo() const { return processorInfo_; }
@@ -128,7 +128,7 @@ void MarchingSquares::process() {
 
     // You can print to the Inviwo console with Log-commands:
     LogProcessorInfo("This scalar field contains values between " << minValue << " and " << maxValue
-                                                                  << ".");
+        << ".");
     // You can also inform about errors and warnings:
     // LogProcessorWarn("I am warning about something"); // Will print warning message in yellow
     // LogProcessorError("I am letting you know about an error"); // Will print error message in red
@@ -150,7 +150,7 @@ void MarchingSquares::process() {
     // with index i ranging between [0, nx-1] and j in [0, ny-1]
     ivec2 ij = {0, 0};
     double valueAt00 = grid.getValueAtVertex(ij);
-    LogProcessorInfo("The value at (0,0) is: " << valueAt00 << ".");
+    LogProcessorInfo("The max coordinates are: " << bBoxMax << ".");
 
     // Initialize the output: mesh and vertices for the grid and bounding box
     auto gridmesh = std::make_shared<BasicMesh>();
@@ -158,17 +158,17 @@ void MarchingSquares::process() {
 
     auto indexBufferBBox = gridmesh->addIndexBuffer(DrawType::Lines, ConnectivityType::None);
     // bottomLeft to topLeft
-    drawLineSegment(bBoxMin, vec2(bBoxMin[0], bBoxMax[1]), propGridColor.get(),
-                    indexBufferBBox.get(), gridvertices);
-    // topLeft to topRight
-    drawLineSegment(vec2(bBoxMin[0], bBoxMax[1]), bBoxMax, propGridColor.get(),
-                    indexBufferBBox.get(), gridvertices);
-    // topRight to bottomRight
-    drawLineSegment(bBoxMax, vec2(bBoxMax[0], bBoxMin[1]), propGridColor.get(),
-                    indexBufferBBox.get(), gridvertices);
-    // bottomRight to bottomLeft
-    drawLineSegment(vec2(bBoxMax[0], bBoxMin[1]), bBoxMin, propGridColor.get(),
-                    indexBufferBBox.get(), gridvertices);
+    // drawLineSegment(bBoxMin, vec2(bBoxMin[0], bBoxMax[1]), propGridColor.get(),
+    //                 indexBufferBBox.get(), gridvertices);
+    // // topLeft to topRight
+    // drawLineSegment(vec2(bBoxMin[0], bBoxMax[1]), bBoxMax, propGridColor.get(),
+    //                 indexBufferBBox.get(), gridvertices);
+    // // topRight to bottomRight
+    // drawLineSegment(bBoxMax, vec2(bBoxMax[0], bBoxMin[1]), propGridColor.get(),
+    //                 indexBufferBBox.get(), gridvertices);
+    // // bottomRight to bottomLeft
+    // drawLineSegment(vec2(bBoxMax[0], bBoxMin[1]), bBoxMin, propGridColor.get(),
+    //                 indexBufferBBox.get(), gridvertices);
 
     // Set the random seed to the one selected in the interface
     randGenerator.seed(static_cast<std::mt19937::result_type>(propRandomSeed.get()));
@@ -177,23 +177,40 @@ void MarchingSquares::process() {
     float maxRand = 1.0;
     float rand = randomValue(minRand, maxRand);
     LogProcessorInfo("The first random sample for seed " << propRandomSeed.get() << " between "
-                                                         << minRand << " and " << maxRand << " is "
-                                                         << rand << ".");
+        << minRand << " and " << maxRand << " is "
+        << rand << ".");
 
     // Properties are accessed with propertyName.get()
     if (propShowGrid.get()) {
         // TODO: Add grid lines of the given color
+        auto indexBufferGrid = gridmesh->addIndexBuffer(DrawType::Lines, ConnectivityType::None);
 
+        for (int x = 0; x < grid.getNumVerticesPerDim().x; x++) {
+
+            vec2 point1 = grid.getPositionAtVertex(vec2(x, 0));
+            vec2 point2 = grid.getPositionAtVertex(vec2(x, grid.getNumVerticesPerDim().y - 1));
+            drawLineSegment(point1, point2, propGridColor.get(), indexBufferGrid.get(),
+                            gridvertices);
+
+        }
+
+        for (int y = 0; y < grid.getNumVerticesPerDim().y; y++) {
+            vec2 point1 = grid.getPositionAtVertex(vec2(0, y));
+            vec2 point2 = grid.getPositionAtVertex(vec2(grid.getNumVerticesPerDim().x - 1, y));
+
+            drawLineSegment(point1, point2, propGridColor.get(), indexBufferGrid.get(),
+                            gridvertices);
+        }
         // The function drawLineSegments creates two vertices at the specified positions,
         // that are placed into the Vertex vector defining our mesh.
         // An index buffer specifies which of those vertices should be grouped into to make up
         // lines/trianges/quads. Here two vertices make up a line segment.
-        auto indexBufferGrid = gridmesh->addIndexBuffer(DrawType::Lines, ConnectivityType::None);
 
         // Draw a line segment from v1 to v2 with a the given color for the grid
-        vec2 v1 = vec2(0.5, 0.5);
-        vec2 v2 = vec2(0.7, 0.7);
-        drawLineSegment(v1, v2, propGridColor.get(), indexBufferGrid.get(), gridvertices);
+        // vec2 v1 = vec2(0.5, 0.5);
+        // vec2 v2 = vec2(0.7, 0.7);
+        // drawLineSegment(v1, v2, propGridColor.get(), indexBufferGrid.get(), gridvertices);
+
     }
 
     // Set the created grid mesh as output
@@ -212,13 +229,152 @@ void MarchingSquares::process() {
     auto mesh = std::make_shared<BasicMesh>();
     std::vector<BasicMesh::Vertex> vertices;
 
+    LogProcessorWarn("HUH?");
+
     if (propMultiple.get() == 0) {
+        auto indexBufferLines = mesh->addIndexBuffer(DrawType::Lines, ConnectivityType::None);
         // TODO: Draw a single isoline at the specified isovalue (propIsoValue)
         // and color it with the specified color (propIsoColor)
 
-    }
+        double gridSize = grid.getPositionAtVertex(vec2(1, 0)).x - grid.getPositionAtVertex(
+                              vec2(0, 0)).x;
+        LogProcessorWarn("Grid size: " << gridSize);
 
-    else {
+        for (int x = 0; x < grid.getNumVerticesPerDim().x - 1; x++) {
+            for (int y = 0; y < grid.getNumVerticesPerDim().y - 1; y++) {
+                LogProcessorWarn("Loop through x=" << x << ",y=" << y);
+                vec2 bottomLeft = vec2(x, y);
+                vec2 bottomRight = vec2(x + 1, y);
+                vec2 topLeft = vec2(x, y + 1);
+                vec2 topRight = vec2(x + 1, y + 1);
+
+                std::vector<vec2> specialPoints;
+                
+                double diffBottomLeft = grid.getValueAtVertex(bottomLeft) - propIsoValue.get();
+                double diffBottomRight = grid.getValueAtVertex(bottomRight) - propIsoValue.get();
+                double diffTopLeft = grid.getValueAtVertex(topLeft) - propIsoValue.get();
+                double diffTopRight = grid.getValueAtVertex(topRight) - propIsoValue.get();
+                
+                if (signbit(diffBottomLeft) != signbit(diffBottomRight)) {
+                    double low, high;
+                    bool highIsLeft;
+                    if (grid.getValueAtVertex(bottomLeft) < grid.getValueAtVertex(bottomRight)) {
+                        low = grid.getValueAtVertex(bottomLeft);
+                        high = grid.getValueAtVertex(bottomRight);
+                        highIsLeft = false;
+                    } else {
+                        high = grid.getValueAtVertex(bottomLeft);
+                        low = grid.getValueAtVertex(bottomRight);
+                        highIsLeft = true;
+                    }
+
+                    double diff = high - low;
+                    double middle = propIsoValue.get() - low;
+                    double relative = middle / diff;
+                    if (highIsLeft) {
+                        relative = 1 - relative;
+                    }
+
+                    vec2 newPos = vec2(grid.getPositionAtVertex(bottomLeft).x + relative * gridSize,
+                                       grid.getPositionAtVertex(bottomLeft).y);
+                    specialPoints.push_back(newPos);
+                    
+                }
+
+                if (signbit(diffTopLeft) != signbit(diffTopRight)) {
+                    double low, high;
+                    bool highIsLeft;
+                    if (grid.getValueAtVertex(topLeft) < grid.getValueAtVertex(topRight)) {
+                        low = grid.getValueAtVertex(topLeft);
+                        high = grid.getValueAtVertex(topRight);
+                        highIsLeft = false;
+                    } else {
+                        high = grid.getValueAtVertex(topLeft);
+                        low = grid.getValueAtVertex(topRight);
+                        highIsLeft = true;
+                    }
+
+                    double diff = high - low;
+                    double middle = propIsoValue.get() - low;
+                    double relative = middle / diff;
+                    if (highIsLeft) {
+                        relative = 1 - relative;
+                    }
+
+                    vec2 newPos = vec2(grid.getPositionAtVertex(topLeft).x + relative * gridSize,
+                                       grid.getPositionAtVertex(topLeft).y);
+                    specialPoints.push_back(newPos);
+
+                }
+
+                if (signbit(diffBottomLeft) != signbit(diffTopLeft)) {
+                    double low, high;
+                    bool highIsTop;
+                    if (grid.getValueAtVertex(bottomLeft) < grid.getValueAtVertex(topLeft)) {
+                        low = grid.getValueAtVertex(bottomLeft);
+                        high = grid.getValueAtVertex(topLeft);
+                        highIsTop = false;
+                    } else {
+                        high = grid.getValueAtVertex(bottomLeft);
+                        low = grid.getValueAtVertex(topLeft);
+                        highIsTop = true;
+                    }
+
+                    double diff = high - low;
+                    double middle = propIsoValue.get() - low;
+                    double relative = middle / diff;
+                    if (highIsTop) {
+                        relative = 1 - relative;
+                    }
+
+                    vec2 newPos = vec2(grid.getPositionAtVertex(bottomLeft).x,
+                                       grid.getPositionAtVertex(
+                                           bottomLeft).y + relative * gridSize);
+                    specialPoints.push_back(newPos);
+
+                }
+
+                if (signbit(diffBottomRight) != signbit(diffTopRight)) {
+                    double low, high;
+                    bool highIsTop;
+                    if (grid.getValueAtVertex(bottomRight) < grid.getValueAtVertex(topRight)) {
+                        low = grid.getValueAtVertex(bottomRight);
+                        high = grid.getValueAtVertex(topRight);
+                        highIsTop = false;
+                    } else {
+                        high = grid.getValueAtVertex(bottomRight);
+                        low = grid.getValueAtVertex(topRight);
+                        highIsTop = true;
+                    }
+
+                    double diff = high - low;
+                    double middle = propIsoValue.get() - low;
+                    double relative = middle / diff;
+                    if (highIsTop) {
+                        relative = 1 - relative;
+                    }
+
+                    vec2 newPos = vec2(grid.getPositionAtVertex(bottomRight).x,
+                                       grid.getPositionAtVertex(bottomRight).y + relative *
+                                       gridSize);
+                    specialPoints.push_back(newPos);
+
+                }
+
+                std::sort(specialPoints.begin(), specialPoints.end(), [](vec2 a, vec2 b) {
+                    return a.x < b.x;
+                });
+                if(specialPoints.size() == 4 && randomValue(minRand, maxRand) > 0.5f && propDeciderType.get() == 1) {
+                    auto tmp = specialPoints[1];
+                    specialPoints[1] = specialPoints[2];
+                    specialPoints[2] = tmp;
+                }
+                for(int i = 0; i < specialPoints.size(); i += 2) {
+                    drawLineSegment(specialPoints[i], specialPoints[i+1], propIsoColor.get(), indexBufferLines.get(), vertices);
+                }
+            }
+        }
+    } else {
         // TODO: Draw the given number (propNumContours) of isolines between
         // the minimum and maximum value
 
@@ -258,4 +414,4 @@ void MarchingSquares::drawLineSegment(const vec2& v1, const vec2& v2, const vec4
     vertices.push_back({vec3(v2[0], v2[1], 0), vec3(0, 0, 1), vec3(v2[0], v2[1], 0), color});
 }
 
-}  // namespace inviwo
+} // namespace inviwo
