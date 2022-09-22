@@ -146,8 +146,8 @@ void MarchingSquares::process() {
 
     // Values at the vertex positions can be accessed by the indices of the vertex
     // with index i ranging between [0, nx-1] and j in [0, ny-1]
-    ivec2 ij = {0, 0};
-    double valueAt00 = grid.getValueAtVertex(ij);
+    // ivec2 ij = {0, 0};
+    // double valueAt00 = grid.getValueAtVertex(ij);
     LogProcessorInfo("The max coordinates are: " << bBoxMax << ".");
 
     // Initialize the output: mesh and vertices for the grid and bounding box
@@ -155,18 +155,6 @@ void MarchingSquares::process() {
     std::vector<BasicMesh::Vertex> gridvertices;
 
     auto indexBufferBBox = gridmesh->addIndexBuffer(DrawType::Lines, ConnectivityType::None);
-    // bottomLeft to topLeft
-    // drawLineSegment(bBoxMin, vec2(bBoxMin[0], bBoxMax[1]), propGridColor.get(),
-    //                 indexBufferBBox.get(), gridvertices);
-    // // topLeft to topRight
-    // drawLineSegment(vec2(bBoxMin[0], bBoxMax[1]), bBoxMax, propGridColor.get(),
-    //                 indexBufferBBox.get(), gridvertices);
-    // // topRight to bottomRight
-    // drawLineSegment(bBoxMax, vec2(bBoxMax[0], bBoxMin[1]), propGridColor.get(),
-    //                 indexBufferBBox.get(), gridvertices);
-    // // bottomRight to bottomLeft
-    // drawLineSegment(vec2(bBoxMax[0], bBoxMin[1]), bBoxMin, propGridColor.get(),
-    //                 indexBufferBBox.get(), gridvertices);
 
     // Set the random seed to the one selected in the interface
     randGenerator.seed(static_cast<std::mt19937::result_type>(propRandomSeed.get()));
@@ -183,32 +171,23 @@ void MarchingSquares::process() {
         // TODO: Add grid lines of the given color
         auto indexBufferGrid = gridmesh->addIndexBuffer(DrawType::Lines, ConnectivityType::None);
 
+        // The function drawLineSegments creates two vertices at the specified positions,
+        // that are placed into the Vertex vector defining our mesh.
+        // An index buffer specifies which of those vertices should be grouped into to make up
+        // lines/trianges/quads. Here two vertices make up a line segment.
         for (int x = 0; x < grid.getNumVerticesPerDim().x; x++) {
-
             vec2 point1 = grid.getPositionAtVertex(vec2(x, 0));
             vec2 point2 = grid.getPositionAtVertex(vec2(x, grid.getNumVerticesPerDim().y - 1));
             drawLineSegment(point1, point2, propGridColor.get(), indexBufferGrid.get(),
                             gridvertices);
-
         }
 
         for (int y = 0; y < grid.getNumVerticesPerDim().y; y++) {
             vec2 point1 = grid.getPositionAtVertex(vec2(0, y));
             vec2 point2 = grid.getPositionAtVertex(vec2(grid.getNumVerticesPerDim().x - 1, y));
-
             drawLineSegment(point1, point2, propGridColor.get(), indexBufferGrid.get(),
                             gridvertices);
         }
-        // The function drawLineSegments creates two vertices at the specified positions,
-        // that are placed into the Vertex vector defining our mesh.
-        // An index buffer specifies which of those vertices should be grouped into to make up
-        // lines/trianges/quads. Here two vertices make up a line segment.
-
-        // Draw a line segment from v1 to v2 with a the given color for the grid
-        // vec2 v1 = vec2(0.5, 0.5);
-        // vec2 v2 = vec2(0.7, 0.7);
-        // drawLineSegment(v1, v2, propGridColor.get(), indexBufferGrid.get(), gridvertices);
-
     }
 
     // Set the created grid mesh as output
@@ -227,8 +206,7 @@ void MarchingSquares::process() {
     auto mesh = std::make_shared<BasicMesh>();
     std::vector<BasicMesh::Vertex> vertices;
     auto indexBufferLines = mesh->addIndexBuffer(DrawType::Lines, ConnectivityType::None);
-    LogProcessorWarn("HUH?");
-    auto drawIsoContour = [&](double propertyIsoValue, double gridSize, ScalarField2 grid, vec4 color) {
+    auto drawIsoContour = [&](double propertyIsoValue, ScalarField2 grid, vec4 color) {
         for (int x = 0; x < grid.getNumVerticesPerDim().x - 1; x++) {
             for (int y = 0; y < grid.getNumVerticesPerDim().y - 1; y++) {
                 // LogProcessorWarn("Loop through x=" << x << ",y=" << y);
@@ -268,7 +246,7 @@ void MarchingSquares::process() {
                         relative = 1 - relative;
                     }
 
-                    vec2 newPos = vec2(grid.getPositionAtVertex(bottomLeft).x + relative * gridSize,
+                    vec2 newPos = vec2(grid.getPositionAtVertex(bottomLeft).x + relative * cellSize.x,
                                        grid.getPositionAtVertex(bottomLeft).y);
                     specialPoints.push_back(newPos);
 
@@ -294,7 +272,7 @@ void MarchingSquares::process() {
                         relative = 1 - relative;
                     }
 
-                    vec2 newPos = vec2(grid.getPositionAtVertex(topLeft).x + relative * gridSize,
+                    vec2 newPos = vec2(grid.getPositionAtVertex(topLeft).x + relative * cellSize.x,
                                        grid.getPositionAtVertex(topLeft).y);
                     specialPoints.push_back(newPos);
 
@@ -322,7 +300,7 @@ void MarchingSquares::process() {
 
                     vec2 newPos = vec2(grid.getPositionAtVertex(bottomLeft).x,
                                        grid.getPositionAtVertex(
-                                           bottomLeft).y + relative * gridSize);
+                                           bottomLeft).y + relative * cellSize.y);
                     specialPoints.push_back(newPos);
                 }
 
@@ -348,7 +326,7 @@ void MarchingSquares::process() {
 
                     vec2 newPos = vec2(grid.getPositionAtVertex(bottomRight).x,
                                        grid.getPositionAtVertex(bottomRight).y + relative *
-                                       gridSize);
+                                       cellSize.y);
                     specialPoints.push_back(newPos);
 
                 }
@@ -370,21 +348,10 @@ void MarchingSquares::process() {
             }
         }
     };
-    double gridSize = grid.getPositionAtVertex(vec2(1, 0)).x - grid.getPositionAtVertex(
-                              vec2(0, 0)).x;
 
     if (propMultiple.get() == 0) {
-        
-        // TODO: Draw a single isoline at the specified isovalue (propIsoValue)
-        // and color it with the specified color (propIsoColor)
-
-        
         double propertyIsoValue = propIsoValue.get();
-
-        LogProcessorWarn("Grid size: " << gridSize);
-
-        drawIsoContour(propertyIsoValue, gridSize, grid, propIsoColor.get());
-
+        drawIsoContour(propertyIsoValue, grid, propIsoColor.get());
     } else {
         int numContours = propNumContours.get();
 
@@ -397,7 +364,7 @@ void MarchingSquares::process() {
         double increase = (maxValue - minValue) / numContours;
         double currentValue = minValue + increase/2;
         for (int i = 0; i< numContours; i++) {
-            drawIsoContour(currentValue, gridSize, grid, transfer(i));
+            drawIsoContour(currentValue, grid, transfer(i));
             currentValue = currentValue + increase;
         }
     }
