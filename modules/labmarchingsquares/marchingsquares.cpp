@@ -42,6 +42,7 @@ MarchingSquares::MarchingSquares()
     , propIsoColor("isoColor", "Color", vec4(0.0f, 0.0f, 1.0f, 1.0f), vec4(0.0f), vec4(1.0f),
                    vec4(0.1f), InvalidationLevel::InvalidOutput, PropertySemantics::Color)
     , propNumContours("numContours", "Number of Contours", 1, 1, 50, 1)
+    , propGauss("gauss", "Gaussian Filtering")
     , propIsoTransferFunc("isoTransferFunc", "Colors", &inData) {
     // Register ports
     addPort(inData);
@@ -68,6 +69,8 @@ MarchingSquares::MarchingSquares()
     propMultiple.addOption("multiple", "Multiple", 1);
     addProperty(propNumContours);
     addProperty(propIsoTransferFunc);
+
+    addProperty(propGauss);
 
     // The default transfer function has just two blue points
     propIsoTransferFunc.get().clear();
@@ -158,17 +161,10 @@ void MarchingSquares::process() {
 
     // Set the random seed to the one selected in the interface
     randGenerator.seed(static_cast<std::mt19937::result_type>(propRandomSeed.get()));
-    // You can create a random sample between min and max with
-    float minRand = 0.0;
-    float maxRand = 1.0;
-    float rand = randomValue(minRand, maxRand);
-    LogProcessorInfo("The first random sample for seed " << propRandomSeed.get() << " between "
-        << minRand << " and " << maxRand << " is "
-        << rand << ".");
+    auto rand = [&]() { return randomValue(0.0, 1.0);};
 
     // Properties are accessed with propertyName.get()
     if (propShowGrid.get()) {
-        // TODO: Add grid lines of the given color
         auto indexBufferGrid = gridmesh->addIndexBuffer(DrawType::Lines, ConnectivityType::None);
 
         // The function drawLineSegments creates two vertices at the specified positions,
@@ -194,30 +190,48 @@ void MarchingSquares::process() {
     gridmesh->addVertices(gridvertices);
     meshGridOut.setData(gridmesh);
 
-    // TODO (Bonus) Gaussian filter
     // Our input is const (i.e. cannot be altered), but you need to compute smoothed data and write
     // it somewhere
-    // Create an editable structured grid with ScalarField2 smoothedField =
-    // ScalarField2(nVertPerDim, bBoxMin, bBoxMax - bBoxMin); Values can be set with
-    // smoothedField.setValueAtVertex({0, 0}, 4.2);
-    // and read again in the same way as before
-    // smoothedField.getValueAtVertex(ij);
+    ScalarField2 smoothedField = ScalarField2(nVertPerDim, bBoxMin, bBoxMax - bBoxMin);
+    int sizeX = grid.getNumVerticesPerDim().x,sizeY = grid.getNumVerticesPerDim().y;
+    for (int x = 0; x < sizeX; x++) {
+        for (int y = 0; y < sizeY; y++) {
+            float sum = 0.0f;
+            int count = 0;
+            for(int i = -2; i <= 2; i++) {
+                for(int j = -2; j <= 2; j++) {
+                    int multipliers[3][3] = {{15,12,5},{12,9,4},{5,4,2}};
+                    int mult = multipliers[std::abs(i)][std::abs(j)];
+                    if(x+i >= 0 && y+j >= 0 && x+i < sizeX && y+j < sizeY) {
+                        sum += grid.getValueAtVertex({x+i,y+j}) * mult;
+                        count += mult;
+                    }
+                }
+            }
+
+            if(propGauss.get()) {
+                smoothedField.setValueAtVertex({x, y}, sum / count);
+            } else {
+                smoothedField.setValueAtVertex({x, y}, grid.getValueAtVertex({x,y}));
+            }
+        }
+    }
     // Initialize the output: mesh and vertices
     auto mesh = std::make_shared<BasicMesh>();
     std::vector<BasicMesh::Vertex> vertices;
     auto indexBufferLines = mesh->addIndexBuffer(DrawType::Lines, ConnectivityType::None);
-    auto drawIsoContour = [&](double propertyIsoValue, ScalarField2 grid, vec4 color) {
-        for (int x = 0; x < grid.getNumVerticesPerDim().x - 1; x++) {
-            for (int y = 0; y < grid.getNumVerticesPerDim().y - 1; y++) {
+    auto drawIsoContour = [&](double propertyIsoValue, vec4 color) {
+        for (int x = 0; x < smoothedField.getNumVerticesPerDim().x - 1; x++) {
+            for (int y = 0; y < smoothedField.getNumVerticesPerDim().y - 1; y++) {
                 // LogProcessorWarn("Loop through x=" << x << ",y=" << y);
                 vec2 bottomLeft = vec2(x, y);
                 vec2 bottomRight = vec2(x + 1, y);
                 vec2 topLeft = vec2(x, y + 1);
                 vec2 topRight = vec2(x + 1, y + 1);
-                double bottomLeftValue = grid.getValueAtVertex(bottomLeft);
-                double bottomRightValue = grid.getValueAtVertex(bottomRight);
-                double topLeftValue = grid.getValueAtVertex(topLeft);
-                double topRightValue = grid.getValueAtVertex(topRight);
+                double bottomLeftValue = smoothedField.getValueAtVertex(bottomLeft);
+                double bottomRightValue = smoothedField.getValueAtVertex(bottomRight);
+                double topLeftValue = smoothedField.getValueAtVertex(topLeft);
+                double topRightValue = smoothedField.getValueAtVertex(topRight);
 
                 std::vector<vec2> specialPoints;
 
@@ -246,8 +260,8 @@ void MarchingSquares::process() {
                         relative = 1 - relative;
                     }
 
-                    vec2 newPos = vec2(grid.getPositionAtVertex(bottomLeft).x + relative * cellSize.x,
-                                       grid.getPositionAtVertex(bottomLeft).y);
+                    vec2 newPos = vec2(smoothedField.getPositionAtVertex(bottomLeft).x + relative * cellSize.x,
+                                       smoothedField.getPositionAtVertex(bottomLeft).y);
                     specialPoints.push_back(newPos);
 
                 }
@@ -272,8 +286,8 @@ void MarchingSquares::process() {
                         relative = 1 - relative;
                     }
 
-                    vec2 newPos = vec2(grid.getPositionAtVertex(topLeft).x + relative * cellSize.x,
-                                       grid.getPositionAtVertex(topLeft).y);
+                    vec2 newPos = vec2(smoothedField.getPositionAtVertex(topLeft).x + relative * cellSize.x,
+                                       smoothedField.getPositionAtVertex(topLeft).y);
                     specialPoints.push_back(newPos);
 
                 }
@@ -298,8 +312,8 @@ void MarchingSquares::process() {
                         relative = 1 - relative;
                     }
 
-                    vec2 newPos = vec2(grid.getPositionAtVertex(bottomLeft).x,
-                                       grid.getPositionAtVertex(
+                    vec2 newPos = vec2(smoothedField.getPositionAtVertex(bottomLeft).x,
+                                       smoothedField.getPositionAtVertex(
                                            bottomLeft).y + relative * cellSize.y);
                     specialPoints.push_back(newPos);
                 }
@@ -324,8 +338,8 @@ void MarchingSquares::process() {
                         relative = 1 - relative;
                     }
 
-                    vec2 newPos = vec2(grid.getPositionAtVertex(bottomRight).x,
-                                       grid.getPositionAtVertex(bottomRight).y + relative *
+                    vec2 newPos = vec2(smoothedField.getPositionAtVertex(bottomRight).x,
+                                       smoothedField.getPositionAtVertex(bottomRight).y + relative *
                                        cellSize.y);
                     specialPoints.push_back(newPos);
 
@@ -334,7 +348,7 @@ void MarchingSquares::process() {
                 std::sort(specialPoints.begin(), specialPoints.end(), [](vec2 a, vec2 b) {
                     return a.x < b.x;
                 });
-                if (specialPoints.size() == 4 && randomValue(minRand, maxRand) > 0.5f &&
+                if (specialPoints.size() == 4 && rand() > 0.5f &&
                     propDeciderType.get() == 1) {
                     auto tmp = specialPoints[1];
                     specialPoints[1] = specialPoints[2];
@@ -351,7 +365,7 @@ void MarchingSquares::process() {
 
     if (propMultiple.get() == 0) {
         double propertyIsoValue = propIsoValue.get();
-        drawIsoContour(propertyIsoValue, grid, propIsoColor.get());
+        drawIsoContour(propertyIsoValue, propIsoColor.get());
     } else {
         int numContours = propNumContours.get();
 
@@ -364,7 +378,7 @@ void MarchingSquares::process() {
         double increase = (maxValue - minValue) / numContours;
         double currentValue = minValue + increase/2;
         for (int i = 0; i< numContours; i++) {
-            drawIsoContour(currentValue, grid, transfer(i));
+            drawIsoContour(currentValue, transfer(i));
             currentValue = currentValue + increase;
         }
     }

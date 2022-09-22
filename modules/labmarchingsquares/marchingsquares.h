@@ -101,6 +101,7 @@ public:
     FloatVec4Property propIsoColor;
     // Properties for multiple iso contours
     IntProperty propNumContours;
+    BoolProperty propGauss;
     TransferFunctionProperty propIsoTransferFunc;
 
     // Attributes
