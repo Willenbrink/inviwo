@@ -100,13 +100,8 @@ MarchingSquares::MarchingSquares()
             util::show(propIsoValue, propIsoColor);
             util::hide(propNumContours, propIsoTransferFunc);
         } else {
-            util::hide(propIsoValue);
-            util::show(propIsoColor, propNumContours);
-
-            // TODO (Bonus): Comment out above if you are using the transfer function
-            // and comment in below instead
-            // util::hide(propIsoValue, propIsoColor);
-            // util::show(propNumContours, propIsoTransferFunc);
+            util::hide(propIsoValue, propIsoColor);
+            util::show(propNumContours, propIsoTransferFunc);
         }
     });
 }
@@ -116,8 +111,6 @@ void MarchingSquares::process() {
     if (!inData.hasData()) {
         return;
     }
-
-    
 
     // Create a structured grid from the input volume
     auto vol = inData.getData();
@@ -393,26 +386,20 @@ void MarchingSquares::process() {
         drawIsoContour(propertyIsoValue, gridSize, grid, propIsoColor.get());
 
     } else {
-        // TODO: Draw the given number (propNumContours) of isolines between
-        // the minimum and maximum value
         int numContours = propNumContours.get();
+
+        // The transfer function normalizes the input data and sampling colors
+        // from the transfer function assumes normalized input, i.e. 0.0 to 1.0
+        auto transfer = [&](int i) {
+            return propIsoTransferFunc.get().sample(static_cast<float>(i) / numContours);
+        };
 
         double increase = (maxValue - minValue) / numContours;
         double currentValue = minValue + increase/2;
         for (int i = 0; i< numContours; i++) {
-            vec3 color = (vec3) (propIsoColor.get() * (numContours-i) / numContours)
-                + vec3(1.0,0.0,0.0) * (i) / numContours;
-            drawIsoContour(currentValue, gridSize, grid, vec4(color,1.0));
+            drawIsoContour(currentValue, gridSize, grid, transfer(i));
             currentValue = currentValue + increase;
         }
-
-        // TODO (Bonus): Use the transfer function property to assign a color
-        // The transfer function normalizes the input data and sampling colors
-        // from the transfer function assumes normalized input, that means
-        // vec4 color = propIsoTransferFunc.get().sample(0.0f);
-        // is the color for the minimum value in the data
-        // vec4 color = propIsoTransferFunc.get().sample(1.0f);
-        // is the color for the maximum value in the data
     }
 
     // Note: It is possible to add multiple index buffers to the same mesh,
