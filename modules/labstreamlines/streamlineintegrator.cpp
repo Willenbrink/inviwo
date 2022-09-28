@@ -171,22 +171,26 @@ void StreamlineIntegrator::process() {
             Integrator::drawPoint(startPoint, vec4(0, 0, 0, 1), indexBufferPoints.get(), vertices);
 
         // TODO: Create one stream line from the given start point
-        vec2 currentPoint = startPoint;
+        dvec2 currentPoint = startPoint;
         double arcLength = 0;
         int i = 0;
         for (; i < propMaxSteps && arcLength < propMaxArcLenght; i++) {
-            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 0.5f, propDirection == 0);
+            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, propStepSize, propDirection == 0);
+            dvec2 movement = newPoint - currentPoint;
+            if (!vectorField.isInside(currentPoint)
+                || glm::length(movement) < propMinVelocity) {
+                break;
+            }
             double distance = sqrt((newPoint.x - currentPoint.x) * (newPoint.x - currentPoint.x) +
                                    (newPoint.y - currentPoint.y) * (newPoint.y - currentPoint.y));
             arcLength =+ distance;
             Integrator::drawLineSegment(currentPoint, newPoint, red, indexBufferStreamLines.get(),
                                         vertices);
-            Integrator::drawPoint(newPoint, red, indexBufferPoints.get(), vertices);
+            if (propDisplayPoints) Integrator::drawPoint(newPoint, red, indexBufferPoints.get(), vertices);
             currentPoint = newPoint;
 
             dvec2 value = vectorField.interpolate(currentPoint);
-            if (!vectorField.isInside(currentPoint)
-                || (std::abs(value.x) < 0.01 && std::abs(value.y) < 0.01)) {
+            if ((std::abs(value.x) < FLT_EPSILON && std::abs(value.y) < FLT_EPSILON)) {
                 break;
             }
         }
