@@ -152,9 +152,7 @@ void StreamlineIntegrator::process() {
         vec2 currentPoint = startPoint;
         int i = 0;
         for (; i < propMaxSteps; i++) {
-            
             dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 0.5f, propDirection == 0);
-            
             if (!vectorField.isInside(newPoint)) {
                 break;
             }
@@ -162,6 +160,12 @@ void StreamlineIntegrator::process() {
                                         vertices);
             Integrator::drawPoint(newPoint, red, indexBufferPoints.get(), vertices);
             currentPoint = newPoint;
+
+            dvec2 value = vectorField.interpolate(currentPoint);
+            if (!vectorField.isInside(currentPoint)
+                || std::abs(value.x) < 0.01 && std::abs(value.y) < 0.01) {
+                break;
+            }
         }
 
         // TODO: Use the propNumStepsTaken property to show how many steps have actually been
