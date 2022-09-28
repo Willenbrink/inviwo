@@ -30,8 +30,11 @@ dvec2 Integrator::RK4(const VectorField2& vectorField, const dvec2& position,
         position + dvec2(v2.x * (stepSize / 2), v2.y * (stepSize / 2)));
     dvec2 v4 = vectorField.interpolate(position + dvec2(v3.x * stepSize, v3.y * stepSize));
     dvec2 finalDirection = v1 / 6 + v2 / 3 + v3 / 3 + v4 / 6;
-    if (forwards) return position + dvec2(finalDirection.x * stepSize, finalDirection.y * stepSize);
-    return position + dvec2(finalDirection.x * stepSize * -1, finalDirection.y * stepSize * -1);
+    dvec2 movement;
+    if (forwards) movement = dvec2(finalDirection.x * stepSize, finalDirection.y * stepSize);
+    else movement = dvec2(finalDirection.x * stepSize * -1, finalDirection.y * stepSize * -1);
+
+    return position + movement;
 }
 
 

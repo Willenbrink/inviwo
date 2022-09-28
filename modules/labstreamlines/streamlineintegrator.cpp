@@ -165,6 +165,21 @@ void StreamlineIntegrator::process() {
     auto mesh = std::make_shared<BasicMesh>();
     std::vector<BasicMesh::Vertex> vertices;
 
+    VectorField2 smoothedField = vectorField;
+    if (propNormalizeVectorField) {
+        smoothedField = VectorField2(vectorField.getNumVerticesPerDim(), BBoxMin_,
+                                     BBoxMax_ - BBoxMin_);
+        int sizeX = vectorField.getNumVerticesPerDim().x, sizeY = vectorField.getNumVerticesPerDim()
+                .y;
+        for (int x = 0; x < sizeX; x++) {
+            for (int y = 0; y < sizeY; y++) {
+                auto val = vectorField.getValueAtVertex({x, y});
+                val = glm::normalize(val);
+                smoothedField.setValueAtVertex({x, y}, val);
+            }
+        }
+    }
+
     if (propSeedMode.get() == 0) {
         auto indexBufferPoints = mesh->addIndexBuffer(DrawType::Points, ConnectivityType::None);
         auto indexBufferStreamLines = mesh->addIndexBuffer(DrawType::Lines, ConnectivityType::None);
@@ -174,22 +189,29 @@ void StreamlineIntegrator::process() {
             Integrator::drawPoint(startPoint, vec4(0, 0, 0, 1), indexBufferPoints.get(), vertices);
 
         // TODO: Create one stream line from the given start point
-        vec2 currentPoint = startPoint;
+        dvec2 currentPoint = startPoint;
         double arcLength = 0;
         int i = 0;
         for (; i < propMaxSteps && arcLength < propMaxArcLenght; i++) {
-            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 0.5f, propDirection == 0);
+            dvec2 newPoint = Integrator::RK4(smoothedField, currentPoint, propStepSize,
+                                             propDirection == 0);
+            dvec2 movement = newPoint - currentPoint;
+            if (!smoothedField.isInside(newPoint)
+                || glm::length(movement) < propMinVelocity) {
+                break;
+            }
             double distance = sqrt((newPoint.x - currentPoint.x) * (newPoint.x - currentPoint.x) +
                                    (newPoint.y - currentPoint.y) * (newPoint.y - currentPoint.y));
-            arcLength =+ distance;
+            arcLength = + distance;
             Integrator::drawLineSegment(currentPoint, newPoint, red, indexBufferStreamLines.get(),
                                         vertices);
-            Integrator::drawPoint(newPoint, red, indexBufferPoints.get(), vertices);
+            if (propDisplayPoints)
+                Integrator::drawPoint(newPoint, red, indexBufferPoints.get(),
+                                      vertices);
             currentPoint = newPoint;
 
-            dvec2 value = vectorField.interpolate(currentPoint);
-            if (!vectorField.isInside(currentPoint)
-                || (std::abs(value.x) < 0.01 && std::abs(value.y) < 0.01)) {
+            dvec2 value = smoothedField.interpolate(currentPoint);
+            if (std::abs(value.x) < FLT_EPSILON && std::abs(value.y) < FLT_EPSILON) {
                 break;
             }
         }
