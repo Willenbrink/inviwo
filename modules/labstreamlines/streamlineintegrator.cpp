@@ -92,18 +92,7 @@ StreamlineIntegrator::StreamlineIntegrator()
     util::hide(propUniformNumX);
     util::hide(propUniformNumY);
 
-    // Show properties for a single seed and hide properties for multiple seeds
-    // (TODO)
-    propSeedMode.onChange([this]() {
-        if (propSeedMode.get() == 0) {
-            util::show(propStartPoint, mouseMoveStart, propNumStepsTaken);
-            util::hide(propUniformGrid);
-        } else {
-            util::hide(propStartPoint, mouseMoveStart, propNumStepsTaken);
-            util::show(propUniformGrid);
-        }
-    });
-    propUniformGrid.onChange([this]() {
+    auto updateUniform = [this]() {
         if (propUniformGrid.get() == 0) {
             util::show(propNumberOfSeeds, propRandomMagnitude);
             util::hide(propUniformNumX, propUniformNumY);
@@ -111,6 +100,22 @@ StreamlineIntegrator::StreamlineIntegrator()
             util::show(propUniformNumX, propUniformNumY);
             util::hide(propNumberOfSeeds, propRandomMagnitude);
         }
+    };
+    // Show properties for a single seed and hide properties for multiple seeds
+    // (TODO)
+    propSeedMode.onChange([this, updateUniform]() {
+        if (propSeedMode.get() == 0) {
+            util::show(propStartPoint, mouseMoveStart, propNumStepsTaken);
+            util::hide(propUniformGrid);
+            updateUniform();
+        } else {
+            util::hide(propStartPoint, mouseMoveStart, propNumStepsTaken);
+            util::show(propUniformGrid);
+            updateUniform();
+        }
+    });
+    propUniformGrid.onChange([this, updateUniform]() {
+        updateUniform();
     });
 }
 
@@ -183,7 +188,7 @@ void StreamlineIntegrator::process() {
     auto indexBufferPoints = mesh->addIndexBuffer(DrawType::Points, ConnectivityType::None);
     auto indexBufferStreamLines = mesh->addIndexBuffer(DrawType::Lines, ConnectivityType::None);
 
-    auto calcStreamline = [this, &indexBufferPoints, &indexBufferStreamLines, &smoothedField, &vertices, &red](vec2 startPoint) {
+    auto calcStreamline = [this, &indexBufferPoints, &indexBufferStreamLines, &smoothedField, &vertices, &red](vec2 startPoint, bool drawPoints) {
         // Draw start point
         if (propDisplayPoints.get() != 0)
             Integrator::drawPoint(startPoint, vec4(0, 0, 0, 1), indexBufferPoints.get(), vertices);
@@ -205,7 +210,7 @@ void StreamlineIntegrator::process() {
             arcLength = + distance;
             Integrator::drawLineSegment(currentPoint, newPoint, red, indexBufferStreamLines.get(),
                                         vertices);
-            if (propDisplayPoints)
+            if (drawPoints && i == 0)
                 Integrator::drawPoint(newPoint, red, indexBufferPoints.get(),
                                       vertices);
             currentPoint = newPoint;
@@ -224,7 +229,7 @@ void StreamlineIntegrator::process() {
 
     if (propSeedMode.get() == 0) {
         vec2 startPoint = propStartPoint.get();
-        calcStreamline(startPoint);
+        calcStreamline(startPoint, propDisplayPoints.get());
     } else {
         if (propUniformGrid.get() == 0) {
             for (int j = 0; j < propNumberOfSeeds; j++) {
@@ -233,7 +238,7 @@ void StreamlineIntegrator::process() {
                 float y = (rand() - drm/2) / drm * (BBoxMax_.y - BBoxMin_.y);
 
                 vec2 startPoint = vec2(x, y);
-                calcStreamline(startPoint);
+                calcStreamline(startPoint, false);
             }
         } else {
             // (TODO: Bonus, sample randomly according to magnitude of the vector field)
@@ -243,7 +248,7 @@ void StreamlineIntegrator::process() {
             for(int i = 0; i < max_x; i++) {
                 for(int j = 0; j < max_y; j++) {
                     dvec2 startPoint = BBoxMin_ + dvec2(stepSize.x * i, stepSize.y * j);
-                    calcStreamline(startPoint);
+                    calcStreamline(startPoint, false);
                 }
             }
         }
