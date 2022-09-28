@@ -98,7 +98,6 @@ public:
     IntProperty propMaxSteps;
     DoubleProperty propMaxArcLenght;
     DoubleProperty propMinVelocity;
-    IntProperty propRandomNumStreamLines;
     BoolProperty propUniformGrid;
     IntProperty propUniformNumX;
     IntProperty propUniformNumY;

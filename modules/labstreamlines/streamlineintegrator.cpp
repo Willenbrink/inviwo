@@ -46,12 +46,11 @@ StreamlineIntegrator::StreamlineIntegrator()
     , propMaxSteps("maxSteps", "Maximum number of steps", 18)
     , propMaxArcLenght("maxArcLenght", "Maximum arc lenght", 0.5, 0, 10)
     , propMinVelocity("minVelocity", "Minimum velocity", 0.001)
-    , propRandomNumStreamLines("randomNumStreamLines", "Number of streamlines", 100)
     , propUniformGrid("uniformGrid", "Use a uniform grid", true)
     , propUniformNumX("uniformNumX", "Number of sample points in X direction", 10)
     , propUniformNumY("uniformNumY", "Number of sample points in Y direction", 10)
     , propRandomMagnitude("randomMagnitude", "Prefer samples at points of high magnitude", false)
-    , propNumberOfSeeds("NumberOfSeeds", "Number of Seeds", 5, 1, 50)
+    , propNumberOfSeeds("NumberOfSeeds", "Number of random seeds", 100, 1, 1000)
 
 // TODO: Initialize additional properties
 // propertyName("propertyIdentifier", "Display Name of the Propery",
@@ -84,12 +83,14 @@ StreamlineIntegrator::StreamlineIntegrator()
     addProperty(propUniformGrid);
     addProperty(propUniformNumX);
     addProperty(propUniformNumY);
-    addProperty(propRandomNumStreamLines);
     addProperty(propRandomMagnitude);
     addProperty(propNumberOfSeeds);
 
-    util::hide(propRandomNumStreamLines);
+    util::hide(propNumberOfSeeds);
     util::hide(propRandomMagnitude);
+    util::hide(propUniformGrid);
+    util::hide(propUniformNumX);
+    util::hide(propUniformNumY);
 
     // Show properties for a single seed and hide properties for multiple seeds
     // (TODO)
@@ -104,11 +105,11 @@ StreamlineIntegrator::StreamlineIntegrator()
     });
     propUniformGrid.onChange([this]() {
         if (propUniformGrid.get() == 0) {
-            util::show(propRandomNumStreamLines, propRandomMagnitude);
+            util::show(propNumberOfSeeds, propRandomMagnitude);
             util::hide(propUniformNumX, propUniformNumY);
         } else {
             util::show(propUniformNumX, propUniformNumY);
-            util::hide(propRandomNumStreamLines, propRandomMagnitude);
+            util::hide(propNumberOfSeeds, propRandomMagnitude);
         }
     });
 }
@@ -225,62 +226,25 @@ void StreamlineIntegrator::process() {
         vec2 startPoint = propStartPoint.get();
         calcStreamline(startPoint);
     } else {
-        // TODO: Seed multiple stream lines either randomly or using a uniform grid
-        for (int j = 0; j < propNumberOfSeeds; j++) {
-            auto indexBufferPoints = mesh->addIndexBuffer(DrawType::Points, ConnectivityType::None);
-            auto indexBufferStreamLines =
-                mesh->addIndexBuffer(DrawType::Lines, ConnectivityType::None);
-            
-            //srand(j);
-            //rand();
-            double drm = double(RAND_MAX);
-            float x = (double(rand() - drm/2) / (drm + 1.0)) * (BBoxMax_.x - BBoxMin_.x) ;
-            
-            float y = (double(rand() - drm/2) / (drm + 1.0)) * (BBoxMax_.y - BBoxMin_.y);
-            
-            LogProcessorWarn("x" << x << ",y=" << y);
-            vec2 startPoint = vec2(x, y);  // dvec2(srand(1), srand(1));  // mk
-            // Draw start point
-            if (propDisplayPoints.get() != 0)
-                Integrator::drawPoint(startPoint, vec4(0, 0, 0, 1), indexBufferPoints.get(),
-                                      vertices);
+        if (propUniformGrid.get() == 0) {
+            for (int j = 0; j < propNumberOfSeeds; j++) {
+                double drm = double(RAND_MAX);
+                float x = (rand() - drm/2) / drm * (BBoxMax_.x - BBoxMin_.x);
+                float y = (rand() - drm/2) / drm * (BBoxMax_.y - BBoxMin_.y);
 
-            // TODO: Create one stream line from the given start point
-            vec2 currentPoint = startPoint;
-            double arcLength = 0;
-            int i = 0;
-            for (; i < propMaxSteps && arcLength < propMaxArcLenght; i++) {
-                dvec2 newPoint =
-                    Integrator::RK4(vectorField, currentPoint, 0.5f, propDirection == 0);
-                double distance =
-                    sqrt((newPoint.x - currentPoint.x) * (newPoint.x - currentPoint.x) +
-                         (newPoint.y - currentPoint.y) * (newPoint.y - currentPoint.y));
-                arcLength = +distance;
-                Integrator::drawLineSegment(currentPoint, newPoint, red,
-                                            indexBufferStreamLines.get(), vertices);
-                Integrator::drawPoint(newPoint, red, indexBufferPoints.get(), vertices);
-                currentPoint = newPoint;
-
-                dvec2 value = vectorField.interpolate(currentPoint);
-                if (!vectorField.isInside(currentPoint) ||
-                    (std::abs(value.x) < 0.01 && std::abs(value.y) < 0.01)) {
-                    break;
-                }
-            }
-            propNumStepsTaken.set(i);
-        }
-
-
-
-
-        // (TODO: Bonus, sample randomly according to magnitude of the vector field)
-        int max_x = propUniformNumX.get();
-        int max_y = propUniformNumY.get();
-        const dvec2 stepSize = {(BBoxMax_.x - BBoxMin_.x) / max_x, (BBoxMax_.y - BBoxMin_.y) / max_y};
-        for(int i = 0; i < max_x; i++) {
-            for(int j = 0; j < max_y; j++) {
-                dvec2 startPoint = BBoxMin_ + dvec2(stepSize.x * i, stepSize.y * j);
+                vec2 startPoint = vec2(x, y);
                 calcStreamline(startPoint);
+            }
+        } else {
+            // (TODO: Bonus, sample randomly according to magnitude of the vector field)
+            int max_x = propUniformNumX.get();
+            int max_y = propUniformNumY.get();
+            const dvec2 stepSize = {(BBoxMax_.x - BBoxMin_.x) / max_x, (BBoxMax_.y - BBoxMin_.y) / max_y};
+            for(int i = 0; i < max_x; i++) {
+                for(int j = 0; j < max_y; j++) {
+                    dvec2 startPoint = BBoxMin_ + dvec2(stepSize.x * i, stepSize.y * j);
+                    calcStreamline(startPoint);
+                }
             }
         }
     }
