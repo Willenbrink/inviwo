@@ -113,6 +113,8 @@ void StreamlineIntegrator::process() {
     auto indexBufferBBox = bboxMesh->addIndexBuffer(DrawType::Lines, ConnectivityType::Strip);
     // Bounding Box vertex 0
     vec4 black = vec4(0, 0, 0, 1);
+    vec4 red = vec4(1, 0, 0, 1);
+    vec4 blue = vec4(0, 0, 1, 1);
     Integrator::drawNextPointInPolyline(BBoxMin_, black, indexBufferBBox.get(), bboxVertices);
     Integrator::drawNextPointInPolyline(vec2(BBoxMin_[0], BBoxMax_[1]), black,
                                         indexBufferBBox.get(), bboxVertices);
@@ -129,12 +131,25 @@ void StreamlineIntegrator::process() {
 
     if (propSeedMode.get() == 0) {
         auto indexBufferPoints = mesh->addIndexBuffer(DrawType::Points, ConnectivityType::None);
+        auto indexBufferStreamLines = mesh->addIndexBuffer(DrawType::Lines, ConnectivityType::None);
         vec2 startPoint = propStartPoint.get();
         // Draw start point
         if (propDisplayPoints.get() != 0)
             Integrator::drawPoint(startPoint, vec4(0, 0, 0, 1), indexBufferPoints.get(), vertices);
 
         // TODO: Create one stream line from the given start point
+        vec2 currentPoint = startPoint;
+        for (int i = 0; i < propDisplayPoints; i++) {
+            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 0.5f);
+
+            if (!vectorField.isInside(newPoint)) {
+                break;
+            }
+            Integrator::drawLineSegment(currentPoint, newPoint, red, indexBufferStreamLines.get(),
+                                        vertices);
+            Integrator::drawPoint(newPoint, red, indexBufferPoints.get(), vertices);
+            currentPoint = newPoint;
+        }
 
         // TODO: Use the propNumStepsTaken property to show how many steps have actually been
         // integrated This could be different from the desired number of steps due to stopping
