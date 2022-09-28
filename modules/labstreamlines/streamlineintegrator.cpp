@@ -172,9 +172,13 @@ void StreamlineIntegrator::process() {
 
         // TODO: Create one stream line from the given start point
         vec2 currentPoint = startPoint;
+        double arcLength = 0;
         int i = 0;
-        for (; i < propMaxSteps; i++) {
+        for (; i < propMaxSteps && arcLength < propMaxArcLenght; i++) {
             dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 0.5f, propDirection == 0);
+            double distance = sqrt((newPoint.x - currentPoint.x) * (newPoint.x - currentPoint.x) +
+                                   (newPoint.y - currentPoint.y) * (newPoint.y - currentPoint.y));
+            arcLength =+ distance;
             Integrator::drawLineSegment(currentPoint, newPoint, red, indexBufferStreamLines.get(),
                                         vertices);
             Integrator::drawPoint(newPoint, red, indexBufferPoints.get(), vertices);
