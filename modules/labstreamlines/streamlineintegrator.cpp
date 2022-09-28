@@ -44,7 +44,7 @@ StreamlineIntegrator::StreamlineIntegrator()
     , propStepSize("stepSize", "Step size", 0.5)
     , propNormalizeVectorField("normalizeVectorField", "Normalize vector field", false)
     , propMaxSteps("maxSteps", "Maximum number of steps", 18)
-    , propMaxArcLenght("maxArcLenght", "Maximum arc lenght", 100.0f, 0, 1000.0f)
+    , propMaxArcLenght("maxArcLenght", "Maximum arc lenght", 100, 0, 1000)
     , propMinVelocity("minVelocity", "Minimum velocity", 0.001)
 // TODO: Initialize additional properties
 // propertyName("propertyIdentifier", "Display Name of the Propery",
@@ -65,8 +65,8 @@ StreamlineIntegrator::StreamlineIntegrator()
     addProperty(propNumStepsTaken);
     propNumStepsTaken.setReadOnly(true);
     propNumStepsTaken.setSemantics(PropertySemantics::Text);
-    propDirection.addOption("left", "Left", 0);
-    propDirection.addOption("right", "Right", 1);
+    propDirection.addOption("left", "Forward", 0);
+    propDirection.addOption("right", "Backward", 1);
     addProperty(mouseMoveStart);
     addProperty(propDirection);
     addProperty(propStepSize);
@@ -150,9 +150,13 @@ void StreamlineIntegrator::process() {
 
         // TODO: Create one stream line from the given start point
         vec2 currentPoint = startPoint;
-        for (int i = 0; i < propDisplayPoints; i++) {
+        int i = 0;
+        for (; i < propMaxSteps; i++) {
+            
             dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 0.5f);
-
+            if (propDirection.get() == 0) {
+                newPoint = dvec2(newPoint.x * -1, newPoint.y * -1);
+            }
             if (!vectorField.isInside(newPoint)) {
                 break;
             }
@@ -165,7 +169,7 @@ void StreamlineIntegrator::process() {
         // TODO: Use the propNumStepsTaken property to show how many steps have actually been
         // integrated This could be different from the desired number of steps due to stopping
         // conditions (too slow, boundary, ...)
-        propNumStepsTaken.set(0);
+        propNumStepsTaken.set(i);
 
     } else {
         // TODO: Seed multiple stream lines either randomly or using a uniform grid
