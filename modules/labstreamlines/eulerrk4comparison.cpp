@@ -18,11 +18,11 @@ namespace inviwo {
 
 // The Class Identifier has to be globally unique. Use a reverse DNS naming scheme
 const ProcessorInfo EulerRK4Comparison::processorInfo_{
-    "org.inviwo.EulerRK4Comparison",  // Class identifier
-    "Euler RK4 Comparison",           // Display name
-    "KTH Lab",                        // Category
-    CodeState::Experimental,          // Code state
-    Tags::None,                       // Tags
+    "org.inviwo.EulerRK4Comparison", // Class identifier
+    "Euler RK4 Comparison",          // Display name
+    "KTH Lab",                       // Category
+    CodeState::Experimental,         // Code state
+    Tags::None,                      // Tags
 };
 
 const ProcessorInfo EulerRK4Comparison::getProcessorInfo() const { return processorInfo_; }
@@ -34,11 +34,15 @@ EulerRK4Comparison::EulerRK4Comparison()
     , meshBBoxOut("meshBBoxOut")
     , propStartPoint("startPoint", "Start Point", vec2(0.5, 0.5), vec2(0), vec2(1024), vec2(0.5))
     , mouseMoveStart(
-          "mouseMoveStart", "Move Start", [this](Event* e) { eventMoveStart(e); },
-          MouseButton::Left, MouseState::Press | MouseState::Move),
-// TODO: Initialize additional properties
- propIntegrationSteps("integrationSteps", "Integration steps", 10),
-propStepSize("stepSize", "Step size", 0.1f)
+        "mouseMoveStart", "Move Start", [this](Event* e) { eventMoveStart(e); },
+        MouseButton::Left, MouseState::Press | MouseState::Move)
+    ,
+    // TODO: Initialize additional properties
+    propIntegrationStepsEuler("integrationSteps", "Integration steps Euler", 100)
+    , propStepSizeEuler("stepSizeEuler", "Step size", 0.1f)
+    , propIntegrationStepsRungeKutta("integrationStepsRungeKutta", "Integration steps Runge-Kutta",
+                                     10)
+    , propStepSizeRungeKutta("stepSizeRungeKutta", "Step size Runge-Kutta", 0.5f)
 // propertyName("propertyIdentifier", "Display Name of the Propery",
 // default value (optional), minimum value (optional), maximum value (optional), increment
 // (optional)); propertyIdentifier cannot have spaces
@@ -53,9 +57,19 @@ propStepSize("stepSize", "Step size", 0.1f)
     addProperty(mouseMoveStart);
 
     // TODO: Register additional properties
-    addProperty(propIntegrationSteps);
-    addProperty(propStepSize);
+    addProperty(propIntegrationStepsEuler);
+    addProperty(propStepSizeEuler);
+    addProperty(propIntegrationStepsRungeKutta);
+    addProperty(propStepSizeRungeKutta);
 
+}
+
+template <typename T, typename S> 
+        inline dvec2 operator*(dvec2 const & v, float const & s)
+{
+    return dvec2(
+    v.x * s,
+    v.y * s);
 }
 
 void EulerRK4Comparison::eventMoveStart(Event* event) {
@@ -106,6 +120,7 @@ void EulerRK4Comparison::process() {
     auto indexBufferBBox = bboxMesh->addIndexBuffer(DrawType::Lines, ConnectivityType::Strip);
     // Bounding Box vertex 0
     vec4 black = vec4(0, 0, 0, 1);
+    vec4 red = vec4(1, 0, 0, 1);
     Integrator::drawNextPointInPolyline(BBoxMin_, black, indexBufferBBox.get(), bboxVertices);
     Integrator::drawNextPointInPolyline(vec2(BBoxMin_[0], BBoxMax_[1]), black,
                                         indexBufferBBox.get(), bboxVertices);
@@ -122,6 +137,40 @@ void EulerRK4Comparison::process() {
     Integrator::drawPoint(startPoint, black, indexBufferPoints.get(), vertices);
 
     // TODO: Implement the Euler and Runge-Kutta of 4th order integration schemes
+
+    //Euler 
+    dvec2 currentPoint = startPoint;
+    for (int i = 0; i < propIntegrationStepsEuler; i++) {
+        if (!vectorField.isInside(currentPoint)) {
+            break;
+        }
+        auto direction = vectorField.interpolate(currentPoint);
+        auto newPoint = currentPoint + direction.operator*=(propStepSizeEuler);
+        Integrator::drawLineSegment(currentPoint, newPoint, black, indexBufferEuler.get(),
+                                    vertices);
+        currentPoint = newPoint;
+    }
+
+    // Runge-Kutta
+
+    currentPoint = startPoint;
+    for (int i = 0; i < propIntegrationStepsRungeKutta; i++) {
+        if (!vectorField.isInside(currentPoint)) {
+            break;
+        }
+
+        dvec2 v1 = vectorField.interpolate(currentPoint);
+        dvec2 v2 = vectorField.interpolate(currentPoint + dvec2(v1.x * (propStepSizeRungeKutta / 2.0f), v1.y * (propStepSizeRungeKutta / 2.0f)));
+        dvec2 v3 = vectorField.interpolate(currentPoint + dvec2(v2.x * (propStepSizeRungeKutta / 2), v2.y * (propStepSizeRungeKutta / 2)));
+        dvec2 v4 = vectorField.interpolate(currentPoint + dvec2(v3.x * propStepSizeRungeKutta, v3.y * propStepSizeRungeKutta));
+        dvec2 huh = v1 / 6 + v2 / 3 + v3/ 3 + v4 / 6;
+        dvec2 newPoint = currentPoint + dvec2(huh.x * propStepSizeRungeKutta, huh.y * propStepSizeRungeKutta);
+
+        Integrator::drawLineSegment(currentPoint, newPoint, red, indexBufferRK.get(),
+                                    vertices);
+        currentPoint = newPoint;
+    }
+
     // and then integrate forward for a specified number of integration steps and a given stepsize
     // (these should be additional properties of the processor)
 
@@ -132,4 +181,4 @@ void EulerRK4Comparison::process() {
     meshOut.setData(mesh);
 }
 
-}  // namespace inviwo
+} // namespace inviwo
