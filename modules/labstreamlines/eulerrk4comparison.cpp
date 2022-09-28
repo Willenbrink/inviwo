@@ -35,8 +35,10 @@ EulerRK4Comparison::EulerRK4Comparison()
     , propStartPoint("startPoint", "Start Point", vec2(0.5, 0.5), vec2(0), vec2(1024), vec2(0.5))
     , mouseMoveStart(
           "mouseMoveStart", "Move Start", [this](Event* e) { eventMoveStart(e); },
-          MouseButton::Left, MouseState::Press | MouseState::Move)
+          MouseButton::Left, MouseState::Press | MouseState::Move),
 // TODO: Initialize additional properties
+ propIntegrationSteps("integrationSteps", "Integration steps", 10),
+propStepSize("stepSize", "Step size", 0.1f)
 // propertyName("propertyIdentifier", "Display Name of the Propery",
 // default value (optional), minimum value (optional), maximum value (optional), increment
 // (optional)); propertyIdentifier cannot have spaces
@@ -51,7 +53,8 @@ EulerRK4Comparison::EulerRK4Comparison()
     addProperty(mouseMoveStart);
 
     // TODO: Register additional properties
-    // addProperty(propertyName);
+    addProperty(propIntegrationSteps);
+    addProperty(propStepSize);
 
 }
 
