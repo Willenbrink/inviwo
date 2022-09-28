@@ -175,9 +175,6 @@ void StreamlineIntegrator::process() {
         int i = 0;
         for (; i < propMaxSteps; i++) {
             dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 0.5f, propDirection == 0);
-            if (!vectorField.isInside(newPoint)) {
-                break;
-            }
             Integrator::drawLineSegment(currentPoint, newPoint, red, indexBufferStreamLines.get(),
                                         vertices);
             Integrator::drawPoint(newPoint, red, indexBufferPoints.get(), vertices);
@@ -185,7 +182,7 @@ void StreamlineIntegrator::process() {
 
             dvec2 value = vectorField.interpolate(currentPoint);
             if (!vectorField.isInside(currentPoint)
-                || std::abs(value.x) < 0.01 && std::abs(value.y) < 0.01) {
+                || (std::abs(value.x) < 0.01 && std::abs(value.y) < 0.01)) {
                 break;
             }
         }
