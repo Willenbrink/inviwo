@@ -19,11 +19,11 @@ namespace inviwo {
 // The Class Identifier has to be globally unique. Use a reverse DNS naming
 // scheme
 const ProcessorInfo StreamlineIntegrator::processorInfo_{
-    "org.inviwo.StreamlineIntegrator",  // Class identifier
-    "Streamline Integrator",            // Display name
-    "KTH Lab",                          // Category
-    CodeState::Experimental,            // Code state
-    Tags::None,                         // Tags
+    "org.inviwo.StreamlineIntegrator", // Class identifier
+    "Streamline Integrator",           // Display name
+    "KTH Lab",                         // Category
+    CodeState::Experimental,           // Code state
+    Tags::None,                        // Tags
 };
 
 const ProcessorInfo StreamlineIntegrator::getProcessorInfo() const { return processorInfo_; }
@@ -38,8 +38,14 @@ StreamlineIntegrator::StreamlineIntegrator()
     , propSeedMode("seedMode", "Seeds")
     , propNumStepsTaken("numstepstaken", "Number of actual steps", 0, 0, 100000)
     , mouseMoveStart(
-          "mouseMoveStart", "Move Start", [this](Event* e) { eventMoveStart(e); },
-          MouseButton::Left, MouseState::Press | MouseState::Move)
+        "mouseMoveStart", "Move Start", [this](Event* e) { eventMoveStart(e); },
+        MouseButton::Left, MouseState::Press | MouseState::Move)
+    , propDirection("direction", "Integration direction")
+    , propStepSize("stepSize", "Step size", 0.5)
+    , propNormalizeVectorField("normalizeVectorField", "Normalize vector field", false)
+    , propMaxSteps("maxSteps", "Maximum number of steps", 18)
+    , propMaxArcLenght("maxArcLenght", "Maximum arc lenght", 100.0f, 0, 1000.0f)
+    , propMinVelocity("minVelocity", "Minimum velocity", 0.001)
 // TODO: Initialize additional properties
 // propertyName("propertyIdentifier", "Display Name of the Propery",
 // default value (optional), minimum value (optional), maximum value (optional),
@@ -59,10 +65,15 @@ StreamlineIntegrator::StreamlineIntegrator()
     addProperty(propNumStepsTaken);
     propNumStepsTaken.setReadOnly(true);
     propNumStepsTaken.setSemantics(PropertySemantics::Text);
+    propDirection.addOption("left", "Left", 0);
+    propDirection.addOption("right", "Right", 1);
     addProperty(mouseMoveStart);
-
-    // TODO: Register additional properties
-    // addProperty(propertyName);
+    addProperty(propDirection);
+    addProperty(propStepSize);
+    addProperty(propNormalizeVectorField);
+    addProperty(propMaxSteps);
+    addProperty(propMaxArcLenght);
+    addProperty(propMinVelocity);
 
     // Show properties for a single seed and hide properties for multiple seeds
     // (TODO)
@@ -165,4 +176,4 @@ void StreamlineIntegrator::process() {
     meshOut.setData(mesh);
 }
 
-}  // namespace inviwo
+} // namespace inviwo

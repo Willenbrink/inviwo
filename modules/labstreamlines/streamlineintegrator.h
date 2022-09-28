@@ -92,6 +92,12 @@ public:
     BoolProperty propDisplayPoints;
     IntProperty propNumStepsTaken;
     EventProperty mouseMoveStart;
+    TemplateOptionProperty<int> propDirection;
+    DoubleProperty propStepSize;
+    BoolProperty propNormalizeVectorField;
+    IntProperty propMaxSteps;
+    DoubleProperty propMaxArcLenght;
+    DoubleProperty propMinVelocity;
 
     // TODO: Declare additional properties
     // Some types that you might need are given below
