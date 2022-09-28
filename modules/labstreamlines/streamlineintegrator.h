@@ -103,6 +103,7 @@ public:
     IntProperty propUniformNumX;
     IntProperty propUniformNumY;
     BoolProperty propRandomMagnitude;
+    IntProperty propNumberOfSeeds;
 
     // TODO: Declare additional properties
     // Some types that you might need are given below
