@@ -8,6 +8,7 @@
  *********************************************************************
  */
 
+#include <random>
 #include <inviwo/core/interaction/events/mouseevent.h>
 #include <inviwo/core/util/utilities.h>
 #include <labstreamlines/integrator.h>
@@ -15,6 +16,22 @@
 #include <labutils/scalarvectorfield.h>
 
 namespace inviwo {
+
+template <typename Numeric, typename Generator = std::mt19937>
+Numeric random(Numeric from, Numeric to) {
+    thread_local static Generator gen(std::random_device{}());
+
+    using dist_type = typename std::conditional
+    <
+        std::is_integral<Numeric>::value
+        , std::uniform_int_distribution<Numeric>
+        , std::uniform_real_distribution<Numeric>
+    >::type;
+
+    thread_local static dist_type dist;
+
+    return dist(gen, typename dist_type::param_type{from, to});
+}
 
 // The Class Identifier has to be globally unique. Use a reverse DNS naming
 // scheme
@@ -207,7 +224,7 @@ void StreamlineIntegrator::process() {
             }
             double distance = sqrt((newPoint.x - currentPoint.x) * (newPoint.x - currentPoint.x) +
                                    (newPoint.y - currentPoint.y) * (newPoint.y - currentPoint.y));
-            arcLength = + distance;
+            arcLength += distance;
             Integrator::drawLineSegment(currentPoint, newPoint, red, indexBufferStreamLines.get(),
                                         vertices);
             if (drawPoints && i == 0)
@@ -232,21 +249,51 @@ void StreamlineIntegrator::process() {
         calcStreamline(startPoint, propDisplayPoints.get());
     } else {
         if (propUniformGrid.get() == 0) {
-            for (int j = 0; j < propNumberOfSeeds; j++) {
-                double drm = double(RAND_MAX);
-                float x = (rand() - drm/2) / drm * (BBoxMax_.x - BBoxMin_.x);
-                float y = (rand() - drm/2) / drm * (BBoxMax_.y - BBoxMin_.y);
+            if (!propRandomMagnitude) {
 
-                vec2 startPoint = vec2(x, y);
-                calcStreamline(startPoint, false);
+                for (int j = 0; j < propNumberOfSeeds; j++) {
+                    double drm = double(RAND_MAX);
+                    float x = (rand() - drm / 2) / drm * (BBoxMax_.x - BBoxMin_.x);
+                    float y = (rand() - drm / 2) / drm * (BBoxMax_.y - BBoxMin_.y);
+
+                    vec2 startPoint = vec2(x, y);
+                    calcStreamline(startPoint, false);
+                }
+            } else {
+                // int sizeX = vectorField.getNumVerticesPerDim().x, sizeY = vectorField.getNumVerticesPerDim().y;
+                // double magnitudeSum = 0;
+                // for (int x = 0; x < sizeX; x++) {
+                //     for (int y = 0; y < sizeY; y++) {
+                //         magnitudeSum += glm::length(vectorField.getValueAtVertex(vec2(x, y)));
+                //     }
+                // }
+                
+                int currentSeeds = 0;
+                while (currentSeeds < propNumberOfSeeds) {
+                    double randomX = random<double>(BBoxMin_.x, BBoxMax_.x);
+                    double randomY = random<double>(BBoxMin_.y, BBoxMax_.y);
+
+                    dvec2 startPoint = dvec2(randomX, randomY);
+                    
+                    auto magnitude = length(vectorField.interpolate(startPoint)) / length(vectorField.getMaxValue());
+
+                    double randomNum = random<double>(0, 1);
+                    if (randomNum * magnitude > 0.2) {
+                        calcStreamline(startPoint, false);
+                        currentSeeds++;
+                    }
+                }
+        
+        
             }
         } else {
             // (TODO: Bonus, sample randomly according to magnitude of the vector field)
             int max_x = propUniformNumX.get();
             int max_y = propUniformNumY.get();
-            const dvec2 stepSize = {(BBoxMax_.x - BBoxMin_.x) / max_x, (BBoxMax_.y - BBoxMin_.y) / max_y};
-            for(int i = 0; i < max_x; i++) {
-                for(int j = 0; j < max_y; j++) {
+            const dvec2 stepSize = {(BBoxMax_.x - BBoxMin_.x) / max_x,
+                                    (BBoxMax_.y - BBoxMin_.y) / max_y};
+            for (int i = 0; i < max_x; i++) {
+                for (int j = 0; j < max_y; j++) {
                     dvec2 startPoint = BBoxMin_ + dvec2(stepSize.x * i, stepSize.y * j);
                     calcStreamline(startPoint, false);
                 }
