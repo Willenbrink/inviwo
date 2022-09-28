@@ -179,11 +179,10 @@ void StreamlineIntegrator::process() {
             }
         }
     }
+    auto indexBufferPoints = mesh->addIndexBuffer(DrawType::Points, ConnectivityType::None);
+    auto indexBufferStreamLines = mesh->addIndexBuffer(DrawType::Lines, ConnectivityType::None);
 
-    if (propSeedMode.get() == 0) {
-        auto indexBufferPoints = mesh->addIndexBuffer(DrawType::Points, ConnectivityType::None);
-        auto indexBufferStreamLines = mesh->addIndexBuffer(DrawType::Lines, ConnectivityType::None);
-        vec2 startPoint = propStartPoint.get();
+    auto calcStreamline = [this, &indexBufferPoints, &indexBufferStreamLines, &smoothedField, &vertices, &red](vec2 startPoint) {
         // Draw start point
         if (propDisplayPoints.get() != 0)
             Integrator::drawPoint(startPoint, vec4(0, 0, 0, 1), indexBufferPoints.get(), vertices);
@@ -220,7 +219,11 @@ void StreamlineIntegrator::process() {
         // integrated This could be different from the desired number of steps due to stopping
         // conditions (too slow, boundary, ...)
         propNumStepsTaken.set(i);
+    };
 
+    if (propSeedMode.get() == 0) {
+        vec2 startPoint = propStartPoint.get();
+        calcStreamline(startPoint);
     } else {
         // TODO: Seed multiple stream lines either randomly or using a uniform grid
         for (int j = 0; j < propNumberOfSeeds; j++) {
@@ -271,6 +274,15 @@ void StreamlineIntegrator::process() {
 
 
         // (TODO: Bonus, sample randomly according to magnitude of the vector field)
+        int max_x = propUniformNumX.get();
+        int max_y = propUniformNumY.get();
+        const dvec2 stepSize = {(BBoxMax_.x - BBoxMin_.x) / max_x, (BBoxMax_.y - BBoxMin_.y) / max_y};
+        for(int i = 0; i < max_x; i++) {
+            for(int j = 0; j < max_y; j++) {
+                dvec2 startPoint = BBoxMin_ + dvec2(stepSize.x * i, stepSize.y * j);
+                calcStreamline(startPoint);
+            }
+        }
     }
 
     mesh->addVertices(vertices);
