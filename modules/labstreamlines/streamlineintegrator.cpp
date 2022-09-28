@@ -153,10 +153,8 @@ void StreamlineIntegrator::process() {
         int i = 0;
         for (; i < propMaxSteps; i++) {
             
-            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 0.5f);
-            if (propDirection.get() == 0) {
-                newPoint = dvec2(newPoint.x * -1, newPoint.y * -1);
-            }
+            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 0.5f, propDirection == 0);
+            
             if (!vectorField.isInside(newPoint)) {
                 break;
             }
