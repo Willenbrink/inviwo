@@ -38,10 +38,10 @@ EulerRK4Comparison::EulerRK4Comparison()
         MouseButton::Left, MouseState::Press | MouseState::Move)
     ,
     // TODO: Initialize additional properties
-    propIntegrationStepsEuler("integrationSteps", "Integration steps Euler", 100)
+    propIntegrationStepsEuler("integrationSteps", "Integration steps Euler", 90)
     , propStepSizeEuler("stepSizeEuler", "Step size", 0.1f)
     , propIntegrationStepsRungeKutta("integrationStepsRungeKutta", "Integration steps Runge-Kutta",
-                                     10)
+                                     18)
     , propStepSizeRungeKutta("stepSizeRungeKutta", "Step size Runge-Kutta", 0.5f)
 // propertyName("propertyIdentifier", "Display Name of the Propery",
 // default value (optional), minimum value (optional), maximum value (optional), increment
@@ -64,12 +64,11 @@ EulerRK4Comparison::EulerRK4Comparison()
 
 }
 
-template <typename T, typename S> 
-        inline dvec2 operator*(dvec2 const & v, float const & s)
-{
+template <typename T, typename S>
+inline dvec2 operator*(dvec2 const& v, float const& s) {
     return dvec2(
-    v.x * s,
-    v.y * s);
+        v.x * s,
+        v.y * s);
 }
 
 void EulerRK4Comparison::eventMoveStart(Event* event) {
@@ -121,6 +120,7 @@ void EulerRK4Comparison::process() {
     // Bounding Box vertex 0
     vec4 black = vec4(0, 0, 0, 1);
     vec4 red = vec4(1, 0, 0, 1);
+    vec4 blue = vec4(0, 0, 1, 1);
     Integrator::drawNextPointInPolyline(BBoxMin_, black, indexBufferBBox.get(), bboxVertices);
     Integrator::drawNextPointInPolyline(vec2(BBoxMin_[0], BBoxMax_[1]), black,
                                         indexBufferBBox.get(), bboxVertices);
@@ -141,13 +141,14 @@ void EulerRK4Comparison::process() {
     //Euler 
     dvec2 currentPoint = startPoint;
     for (int i = 0; i < propIntegrationStepsEuler; i++) {
-        if (!vectorField.isInside(currentPoint)) {
+        auto newPoint = Integrator::Euler(vectorField, currentPoint, propStepSizeEuler);
+
+        if (!vectorField.isInside(newPoint)) {
             break;
         }
-        auto direction = vectorField.interpolate(currentPoint);
-        auto newPoint = currentPoint + direction.operator*=(propStepSizeEuler);
-        Integrator::drawLineSegment(currentPoint, newPoint, black, indexBufferEuler.get(),
+        Integrator::drawLineSegment(currentPoint, newPoint, blue, indexBufferEuler.get(),
                                     vertices);
+        Integrator::drawPoint(newPoint, blue, indexBufferPoints.get(), vertices);
         currentPoint = newPoint;
     }
 
@@ -155,19 +156,14 @@ void EulerRK4Comparison::process() {
 
     currentPoint = startPoint;
     for (int i = 0; i < propIntegrationStepsRungeKutta; i++) {
-        if (!vectorField.isInside(currentPoint)) {
+        dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, propStepSizeRungeKutta);
+
+        if (!vectorField.isInside(newPoint)) {
             break;
         }
-
-        dvec2 v1 = vectorField.interpolate(currentPoint);
-        dvec2 v2 = vectorField.interpolate(currentPoint + dvec2(v1.x * (propStepSizeRungeKutta / 2.0f), v1.y * (propStepSizeRungeKutta / 2.0f)));
-        dvec2 v3 = vectorField.interpolate(currentPoint + dvec2(v2.x * (propStepSizeRungeKutta / 2), v2.y * (propStepSizeRungeKutta / 2)));
-        dvec2 v4 = vectorField.interpolate(currentPoint + dvec2(v3.x * propStepSizeRungeKutta, v3.y * propStepSizeRungeKutta));
-        dvec2 huh = v1 / 6 + v2 / 3 + v3/ 3 + v4 / 6;
-        dvec2 newPoint = currentPoint + dvec2(huh.x * propStepSizeRungeKutta, huh.y * propStepSizeRungeKutta);
-
         Integrator::drawLineSegment(currentPoint, newPoint, red, indexBufferRK.get(),
                                     vertices);
+        Integrator::drawPoint(newPoint, red, indexBufferPoints.get(), vertices);
         currentPoint = newPoint;
     }
 

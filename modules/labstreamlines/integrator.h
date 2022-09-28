@@ -46,8 +46,8 @@ public:
     // Runge-Kutte of 4th order integration method)
     // Pass any other properties that influence the integration process
     // Examples would be the stepsize, inegreation direction, ...
-    // static dvec2 RK4(const VectorField2& vectorField, const dvec2& position, ...);
-    // static dvec2 Euler(const VectorField2& vectorField, const dvec2& position, ...);
+    static dvec2 RK4(const VectorField2& vectorField, const dvec2& position, const double stepSize);
+    static dvec2 Euler(const VectorField2& vectorField, const dvec2& position, const double stepSize);
 };
 
 }  // namespace inviwo
