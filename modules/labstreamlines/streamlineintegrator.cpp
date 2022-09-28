@@ -191,7 +191,7 @@ void StreamlineIntegrator::process() {
             dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, propStepSize,
                                              propDirection == 0);
             dvec2 movement = newPoint - currentPoint;
-            if (!vectorField.isInside(currentPoint)
+            if (!vectorField.isInside(newPoint)
                 || glm::length(movement) < propMinVelocity) {
                 break;
             }
