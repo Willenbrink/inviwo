@@ -98,6 +98,11 @@ public:
     IntProperty propMaxSteps;
     DoubleProperty propMaxArcLenght;
     DoubleProperty propMinVelocity;
+    IntProperty propRandomNumStreamLines;
+    BoolProperty propUniformGrid;
+    IntProperty propUniformNumX;
+    IntProperty propUniformNumY;
+    BoolProperty propRandomMagnitude;
 
     // TODO: Declare additional properties
     // Some types that you might need are given below

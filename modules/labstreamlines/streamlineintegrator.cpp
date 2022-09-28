@@ -46,6 +46,11 @@ StreamlineIntegrator::StreamlineIntegrator()
     , propMaxSteps("maxSteps", "Maximum number of steps", 18)
     , propMaxArcLenght("maxArcLenght", "Maximum arc lenght", 100, 0, 1000)
     , propMinVelocity("minVelocity", "Minimum velocity", 0.001)
+    , propRandomNumStreamLines("randomNumStreamLines", "Number of streamlines", 100)
+    , propUniformGrid("uniformGrid", "Use a uniform grid", true)
+    , propUniformNumX("uniformNumX", "Number of sample points in X direction", 10)
+    , propUniformNumY("uniformNumY", "Number of sample points in Y direction", 10)
+    , propRandomMagnitude("randomMagnitude", "Prefer samples at points of high magnitude", false)
 // TODO: Initialize additional properties
 // propertyName("propertyIdentifier", "Display Name of the Propery",
 // default value (optional), minimum value (optional), maximum value (optional),
@@ -74,16 +79,33 @@ StreamlineIntegrator::StreamlineIntegrator()
     addProperty(propMaxSteps);
     addProperty(propMaxArcLenght);
     addProperty(propMinVelocity);
+    addProperty(propUniformGrid);
+    addProperty(propUniformNumX);
+    addProperty(propUniformNumY);
+    addProperty(propRandomNumStreamLines);
+    addProperty(propRandomMagnitude);
+
+    util::hide(propRandomNumStreamLines);
+    util::hide(propRandomMagnitude);
 
     // Show properties for a single seed and hide properties for multiple seeds
     // (TODO)
     propSeedMode.onChange([this]() {
         if (propSeedMode.get() == 0) {
             util::show(propStartPoint, mouseMoveStart, propNumStepsTaken);
-            // util::hide(...)
+            util::hide(propUniformGrid);
         } else {
             util::hide(propStartPoint, mouseMoveStart, propNumStepsTaken);
-            // util::show(...)
+            util::show(propUniformGrid);
+        }
+    });
+    propUniformGrid.onChange([this]() {
+        if (propUniformGrid.get() == 0) {
+            util::show(propRandomNumStreamLines, propRandomMagnitude);
+            util::hide(propUniformNumX, propUniformNumY);
+        } else {
+            util::show(propUniformNumX, propUniformNumY);
+            util::hide(propRandomNumStreamLines, propRandomMagnitude);
         }
     });
 }
