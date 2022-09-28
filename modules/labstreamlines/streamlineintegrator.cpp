@@ -162,6 +162,18 @@ void StreamlineIntegrator::process() {
     auto mesh = std::make_shared<BasicMesh>();
     std::vector<BasicMesh::Vertex> vertices;
 
+    VectorField2 smoothedField = VectorField2(vectorField.getNumVerticesPerDim(), BBoxMin_, BBoxMax_ - BBoxMin_);
+    int sizeX = vectorField.getNumVerticesPerDim().x,sizeY = vectorField.getNumVerticesPerDim().y;
+    for (int x = 0; x < sizeX; x++) {
+        for (int y = 0; y < sizeY; y++) {
+            auto val = vectorField.getValueAtVertex({x,y});
+            if(propNormalizeVectorField.get() == 1) {
+                val = glm::normalize(val);
+            }
+            smoothedField.setValueAtVertex({x, y}, val);
+        }
+    }
+
     if (propSeedMode.get() == 0) {
         auto indexBufferPoints = mesh->addIndexBuffer(DrawType::Points, ConnectivityType::None);
         auto indexBufferStreamLines = mesh->addIndexBuffer(DrawType::Lines, ConnectivityType::None);
@@ -184,8 +196,8 @@ void StreamlineIntegrator::process() {
             Integrator::drawPoint(newPoint, red, indexBufferPoints.get(), vertices);
             currentPoint = newPoint;
 
-            dvec2 value = vectorField.interpolate(currentPoint);
-            if (!vectorField.isInside(currentPoint)
+            dvec2 value = smoothedField.interpolate(currentPoint);
+            if (!smoothedField.isInside(currentPoint)
                 || (std::abs(value.x) < 0.01 && std::abs(value.y) < 0.01)) {
                 break;
             }
