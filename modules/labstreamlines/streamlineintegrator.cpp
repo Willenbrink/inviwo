@@ -67,7 +67,7 @@ StreamlineIntegrator::StreamlineIntegrator()
     , propUniformNumX("uniformNumX", "Number of sample points in X direction", 10)
     , propUniformNumY("uniformNumY", "Number of sample points in Y direction", 10)
     , propRandomMagnitude("randomMagnitude", "Prefer samples at points of high magnitude", false)
-    , propNumberOfSeeds("NumberOfSeeds", "Number of random seeds", 100, 1, 1000)
+    , propNumberOfSeeds("NumberOfSeeds", "Number of random seeds", 100, 1, 5000)
 
 // TODO: Initialize additional properties
 // propertyName("propertyIdentifier", "Display Name of the Propery",
@@ -227,7 +227,7 @@ void StreamlineIntegrator::process() {
             arcLength += distance;
             Integrator::drawLineSegment(currentPoint, newPoint, red, indexBufferStreamLines.get(),
                                         vertices);
-            if (drawPoints && i == 0)
+            if (drawPoints)
                 Integrator::drawPoint(newPoint, red, indexBufferPoints.get(),
                                       vertices);
             currentPoint = newPoint;
