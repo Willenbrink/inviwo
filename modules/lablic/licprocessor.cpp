@@ -12,6 +12,9 @@
 #include <lablic/licprocessor.h>
 #include <labstreamlines/integrator.h>
 
+#include <random>
+#include <math.h>
+
 namespace inviwo {
 
 // The Class Identifier has to be globally unique. Use a reverse DNS naming scheme
@@ -77,10 +80,11 @@ void LICProcessor::process() {
 
     for (size_t j = 0; j < texDims_.y; j++) {
         for (size_t i = 0; i < texDims_.x; i++) {
-            int val = int(licTexture[i][j]);
+            // int val = int(licTexture[i][j]);
+            int val = rand() * 255;
             licImage.setPixel(size2_t(i, j), dvec4(val, val, val, 255));
             // or
-            licImage.setPixelGrayScale(size2_t(i, j), val);
+            // licImage.setPixelGrayScale(size2_t(i, j), val);
         }
     }
 
