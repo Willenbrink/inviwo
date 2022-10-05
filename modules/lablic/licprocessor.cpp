@@ -57,10 +57,15 @@ void LICProcessor::process() {
     auto vol = volumeIn_.getData();
     const VectorField2 vectorField = VectorField2::createFieldFromVolume(vol);
     vectorFieldDims_ = vol->getDimensions();
+    auto BBoxMin_ = vectorField.getBBoxMin();
+    auto BBoxMax_ = vectorField.getBBoxMax();
+    auto diff = BBoxMax_ - BBoxMin_;
 
     auto tex = noiseTexIn_.getData();
     const RGBAImage texture = RGBAImage::createFromImage(tex);
     texDims_ = tex->getDimensions();
+    // Scale of tex to vectorfield
+    auto scale = dvec2(diff.x / texDims_.x, diff.y / texDims_.y);
 
     double value = texture.readPixelGrayScale(size2_t(0, 0));
 
@@ -77,31 +82,38 @@ void LICProcessor::process() {
 
     // TODO: Implement LIC and FastLIC
     // This code instead sets all pixels to the same gray value
-    auto calcStreamline = [&texture, &vectorField](dvec2 startPoint, int maxSteps) {
+    int breaks = 0, fails = 0;
+    auto calcStreamline = [this, &breaks, &fails, &scale, &texture, &vectorField](dvec2 startPoint, int maxSteps) {
         std::vector<dvec4> samples;
         dvec2 currentPoint = startPoint;
-        dvec4 value = texture.sample(currentPoint);
+        if(!vectorField.isInside(currentPoint)) {
+            fails++;
+            return samples;
+        }
+        dvec4 value = texture.sample(dvec2(currentPoint.x / scale.x, currentPoint.y / scale.y));
         samples.push_back(value);
         for (int i = 0; i < maxSteps; i++) {
-            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 1, 1);
+            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 0.1, 1);
             if (!vectorField.isInside(newPoint)) {
+                breaks++;
                 break;
             }
             currentPoint = newPoint;
 
-            dvec4 value = texture.sample(currentPoint);
+            dvec4 value = texture.sample(dvec2(currentPoint.x / scale.x, currentPoint.y / scale.y));
             samples.push_back(value);
         }
         currentPoint = startPoint;
         std::reverse(samples.begin(), samples.end());
         for (int i = 0; i < maxSteps; i++) {
-            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 1, 0);
+            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 0.1, 0);
             if (!vectorField.isInside(newPoint)) {
+                breaks++;
                 break;
             }
             currentPoint = newPoint;
 
-            dvec4 value = texture.sample(currentPoint);
+            dvec4 value = texture.sample(dvec2(currentPoint.x / scale.x, currentPoint.y / scale.y));
             samples.push_back(value);
         }
         return samples;
@@ -109,19 +121,26 @@ void LICProcessor::process() {
 
     for (size_t j = 0; j < texDims_.y; j++) {
         for (size_t i = 0; i < texDims_.x; i++) {
-            // int val = int(texture.readPixelGrayScale(size2_t(i, j)));
-            auto samples = calcStreamline({i,j}, 2);
-            double val = 0;
+            auto point = BBoxMin_ + dvec2(i * scale.x, j * scale.y);
+            auto samples = calcStreamline(point, 2);
+            int val = 0;
             int len = samples.size();
-            for(int i = 0; i < len; i++) {
-                val += samples[i].x / len;
+            for(int c = 0; c < len; c++) {
+                val += samples[c].x;
             }
+            if(len)
+                val = val / len;
 
+            // int val = int(texture.readPixelGrayScale(size2_t(i, j)));
             licImage.setPixel(size2_t(i, j), dvec4(val, val, val, 255));
             // or
             // licImage.setPixelGrayScale(size2_t(i, j), val);
         }
     }
+    LogProcessorInfo("Fails");
+    LogProcessorInfo(fails);
+    LogProcessorInfo("Breaks");
+    LogProcessorInfo(breaks);
 
     licOut_.setData(outImage);
 }
