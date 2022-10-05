@@ -77,10 +77,46 @@ void LICProcessor::process() {
 
     // TODO: Implement LIC and FastLIC
     // This code instead sets all pixels to the same gray value
+    auto calcStreamline = [&texture, &vectorField](dvec2 startPoint, int maxSteps) {
+        std::vector<dvec4> samples;
+        dvec2 currentPoint = startPoint;
+        dvec4 value = texture.sample(currentPoint);
+        samples.push_back(value);
+        for (int i = 0; i < maxSteps; i++) {
+            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 1, 1);
+            if (!vectorField.isInside(newPoint)) {
+                break;
+            }
+            currentPoint = newPoint;
+
+            dvec4 value = texture.sample(currentPoint);
+            samples.push_back(value);
+        }
+        currentPoint = startPoint;
+        std::reverse(samples.begin(), samples.end());
+        for (int i = 0; i < maxSteps; i++) {
+            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 1, 0);
+            if (!vectorField.isInside(newPoint)) {
+                break;
+            }
+            currentPoint = newPoint;
+
+            dvec4 value = texture.sample(currentPoint);
+            samples.push_back(value);
+        }
+        return samples;
+    };
 
     for (size_t j = 0; j < texDims_.y; j++) {
         for (size_t i = 0; i < texDims_.x; i++) {
-            int val = int(texture.readPixelGrayScale(size2_t(i, j)));
+            // int val = int(texture.readPixelGrayScale(size2_t(i, j)));
+            auto samples = calcStreamline({i,j}, 2);
+            double val = 0;
+            int len = samples.size();
+            for(int i = 0; i < len; i++) {
+                val += samples[i].x / len;
+            }
+
             licImage.setPixel(size2_t(i, j), dvec4(val, val, val, 255));
             // or
             // licImage.setPixelGrayScale(size2_t(i, j), val);
