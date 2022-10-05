@@ -80,8 +80,7 @@ void LICProcessor::process() {
 
     for (size_t j = 0; j < texDims_.y; j++) {
         for (size_t i = 0; i < texDims_.x; i++) {
-            // int val = int(licTexture[i][j]);
-            int val = rand() * 255;
+            int val = int(texture.readPixelGrayScale(size2_t(i, j)));
             licImage.setPixel(size2_t(i, j), dvec4(val, val, val, 255));
             // or
             // licImage.setPixelGrayScale(size2_t(i, j), val);

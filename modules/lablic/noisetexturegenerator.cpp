@@ -78,6 +78,7 @@ void NoiseTextureGenerator::process() {
         for (int i = 0; i < texSize_.get().x; i++) {
 
             val = 256 / 2;
+            val = rand() % 256;
             // TODO: Randomly sample values for the texture, this produces the same gray value for
             // all pixels
             // A value within the ouput image is set by specifying pixel position and color
