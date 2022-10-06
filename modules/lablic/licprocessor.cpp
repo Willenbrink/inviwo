@@ -34,6 +34,7 @@ LICProcessor::LICProcessor()
     , noiseTexIn_("noiseTexIn")
     , licOut_("licOut")
 // TODO: Register additional properties
+    , propKernelSize("kernelSize", "Kernel Size", 50, 1, 200, 1)
 {
     // Register ports
     addPort(volumeIn_);
@@ -42,6 +43,9 @@ LICProcessor::LICProcessor()
 
     // Register properties
     // TODO: Register additional properties
+    addProperty(propKernelSize);
+    
+    
 }
 
 void LICProcessor::process() {
@@ -147,7 +151,7 @@ void LICProcessor::process() {
         for (size_t i = 0; i < texDims_.x; i++) {
             dvec2 point = BBoxMin_ + dvec2(i * scale.x, j * scale.y);
             //TODO user-defined kernel-size
-            auto samples = LIC(point, 50);
+            auto samples = LIC(point, propKernelSize);
             int val = 0;
             int len = samples.size();
             for(int c = 0; c < len; c++) {
@@ -162,6 +166,7 @@ void LICProcessor::process() {
             // licImage.setPixelGrayScale(size2_t(i, j), val);
         }
     }
+    LogProcessorWarn("end");
 
     // TODO contrast enhancement?
 
