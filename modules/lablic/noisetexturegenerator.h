@@ -59,6 +59,7 @@ public:
     // TODO: Declare additional properties
     // IntProperty properyName;
     // TemplateOptionProperty<int> propertyName2;
+    TemplateOptionProperty<int> propGrayScale;
 
     // Attributes
 private:

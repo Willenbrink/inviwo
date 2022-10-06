@@ -29,12 +29,16 @@ NoiseTextureGenerator::NoiseTextureGenerator()
     , texOut_("texOut")
     , texSize_("texSize", "Texture Size", vec2(512, 512), vec2(1, 1), vec2(2048, 2048), vec2(1, 1))
 // TODO: Register additional properties
+, propGrayScale("grayScale", "Texture generation type")
 {
     // Register ports
     addPort(texOut_);
 
     // Register properties
     addProperty(texSize_);
+    propGrayScale.addOption("grayScale", "Grayscale", 1);
+    propGrayScale.addOption("blackWhite", "Black-white", 0);
+    addProperty(propGrayScale);
 
     // TODO: Register additional properties
 }
@@ -73,13 +77,17 @@ void NoiseTextureGenerator::process() {
     value = noiseTexture.sampleGrayScale(dvec2(0.5, 0.5));
     LogProcessorInfo("The interpolated color at (0.5,0.5) is " << color << " with grayscale value "
                                                                << value << ".");
-
+    int half = RAND_MAX / 2;
     for (int j = 0; j < texSize_.get().y; j++) {
         for (int i = 0; i < texSize_.get().x; i++) {
 
-            val = 256 / 2;
-            val = rand() % 256;
-            // A value within the ouput image is set by specifying pixel position and color
+            if (propGrayScale) {
+                val = 256 / 2;
+                val = rand() % 256;
+                // A value within the ouput image is set by specifying pixel position and color
+            } else {
+                val = rand() > half ? 0 : 255;
+            }
             noiseTexture.setPixelGrayScale(size2_t(i, j), val);
             // Alternatively, the entire color can be specified
             // noiseTexture.setPixel(size2_t(i, j), vec4(val, val, val, 255));

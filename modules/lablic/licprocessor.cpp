@@ -19,11 +19,11 @@ namespace inviwo {
 
 // The Class Identifier has to be globally unique. Use a reverse DNS naming scheme
 const ProcessorInfo LICProcessor::processorInfo_{
-    "org.inviwo.LICProcessor",  // Class identifier
-    "LICProcessor",             // Display name
-    "KTH Labs",                 // Category
-    CodeState::Experimental,    // Code state
-    Tags::None,                 // Tags
+    "org.inviwo.LICProcessor", // Class identifier
+    "LICProcessor",            // Display name
+    "KTH Labs",                // Category
+    CodeState::Experimental,   // Code state
+    Tags::None,                // Tags
 };
 
 const ProcessorInfo LICProcessor::getProcessorInfo() const { return processorInfo_; }
@@ -33,6 +33,15 @@ LICProcessor::LICProcessor()
     , volumeIn_("volIn")
     , noiseTexIn_("noiseTexIn")
     , licOut_("licOut")
+    , propMaxSteps("maxSteps", "Max Steps", 5, 0, 1000)
+    , propStepSize("stepSize", "Step size", 0.01, 0, 1)
+    , propUseContrastEnhancement("useContrastEnhancement", "Use Contrast Enhancement", false)
+    , propUseFastLic("useFastLic", "Use FastLIC", false)
+    , propDesiredMean("DesiredMean", "Desired Mean", 255 / 2, 0, 255)
+    , propDesiredStandardDeviation("DesiredStandardDeviation", "Desired Standard Deviation", 25, 0, 255)
+, propRandomSeed("randomSeed", "Random seed", 500, 0, 1000)
+
+
 // TODO: Register additional properties
 {
     // Register ports
@@ -42,6 +51,29 @@ LICProcessor::LICProcessor()
 
     // Register properties
     // TODO: Register additional properties
+
+    addProperty(propMaxSteps);
+    addProperty(propStepSize);
+    addProperty(propUseContrastEnhancement);
+    addProperty(propDesiredMean);
+    addProperty(propDesiredStandardDeviation);
+    addProperty(propUseFastLic);
+    addProperty(propRandomSeed);
+    
+
+    util::hide(propDesiredMean);
+    util::hide(propDesiredStandardDeviation);
+
+    propUseContrastEnhancement.onChange([this]() {
+        if (propUseContrastEnhancement) {
+            util::show(propDesiredMean);
+            util::show(propDesiredStandardDeviation);
+        } else {
+            util::hide(propDesiredMean);
+            util::hide(propDesiredStandardDeviation);
+        }
+    });
+
 }
 
 void LICProcessor::process() {
@@ -88,13 +120,13 @@ void LICProcessor::process() {
         return texture.sample(point);
     };
 
-    auto LIC = [&](dvec2 startPoint, int maxSteps) {
+    auto LIC = [&](dvec2 startPoint) {
         std::vector<dvec4> samples;
         dvec2 currentPoint = startPoint;
         samples.push_back(sampleNoise(currentPoint));
-        for (int i = 0; i < maxSteps; i++) {
+        for (int i = 0; i < propMaxSteps; i++) {
             // TODO use normalized RK4. Works but which approach should we use?
-            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 0.001, 1);
+            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, propStepSize, 1);
             if (!vectorField.isInside(newPoint)) {
                 break;
             }
@@ -103,8 +135,8 @@ void LICProcessor::process() {
             samples.push_back(sampleNoise(currentPoint));
         }
         currentPoint = startPoint;
-        for (int i = 0; i < maxSteps; i++) {
-            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 0.001, 0);
+        for (int i = 0; i < propMaxSteps; i++) {
+            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, propStepSize, 0);
             if (!vectorField.isInside(newPoint)) {
                 break;
             }
@@ -115,14 +147,14 @@ void LICProcessor::process() {
         return samples;
     };
 
-    std::map<dvec2,std::vector<dvec2>> linesMap;
-    auto fastLIC = [&](dvec2 startPoint, int maxSteps) {
+    std::map<dvec2, std::vector<dvec2>> linesMap;
+    auto fastLIC = [&](dvec2 startPoint) {
         std::vector<dvec4> samples;
         dvec2 currentPoint = startPoint;
         samples.push_back(sampleNoise(currentPoint));
-        for (int i = 0; i < maxSteps; i++) {
+        for (int i = 0; i < propMaxSteps; i++) {
             // TODO use normalized RK4. Works but which approach should we use?
-            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 0.001, 1);
+            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, propStepSize, 1);
             if (!vectorField.isInside(newPoint)) {
                 break;
             }
@@ -131,8 +163,8 @@ void LICProcessor::process() {
             samples.push_back(sampleNoise(currentPoint));
         }
         currentPoint = startPoint;
-        for (int i = 0; i < maxSteps; i++) {
-            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 0.001, 0);
+        for (int i = 0; i < propMaxSteps; i++) {
+            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, propStepSize, 0);
             if (!vectorField.isInside(newPoint)) {
                 break;
             }
@@ -147,13 +179,13 @@ void LICProcessor::process() {
         for (size_t i = 0; i < texDims_.x; i++) {
             dvec2 point = BBoxMin_ + dvec2(i * scale.x, j * scale.y);
             //TODO user-defined kernel-size
-            auto samples = LIC(point, 50);
+            auto samples = LIC(point);
             int val = 0;
             int len = samples.size();
-            for(int c = 0; c < len; c++) {
+            for (int c = 0; c < len; c++) {
                 val += samples[c].x;
             }
-            if(len)
+            if (len)
                 val = val / len;
 
             // int val = int(texture.readPixelGrayScale(size2_t(i, j)));
@@ -168,4 +200,4 @@ void LICProcessor::process() {
     licOut_.setData(outImage);
 }
 
-}  // namespace inviwo
+} // namespace inviwo
