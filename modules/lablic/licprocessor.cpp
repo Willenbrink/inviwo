@@ -192,6 +192,54 @@ void LICProcessor::process() {
         }
     }
 
+    
+    int numOfNonBlackPixels = 0;
+    //calculate mean
+    int sum = 0;
+    for (size_t j = 0; j < texDims_.y; j++) {
+        for (size_t i = 0; i < texDims_.x; i++) {
+            if (! licImage.readPixel(size2_t(i, j)).x == 0) {
+                numOfNonBlackPixels++;
+                sum = sum + licImage.readPixel(size2_t(i, j)).x;
+            }
+            
+        }
+    }
+    double mean = sum / numOfNonBlackPixels;
+
+    //calculate standard deviation
+    double totalDif = 0;
+    for (size_t j = 0; j < texDims_.y; j++) {
+        for (size_t i = 0; i < texDims_.x; i++) {
+            if (!licImage.readPixel(size2_t(i, j)).x == 0) {
+                totalDif = totalDif + (licImage.readPixel(size2_t(i, j)).x - mean) *
+                                          (licImage.readPixel(size2_t(i, j)).x - mean);
+            }
+        }
+    }
+    double variance = totalDif / numOfNonBlackPixels;
+    double standardDeviation = sqrt(variance);
+
+    
+    LogProcessorWarn("mean: " << mean); //mean: 126
+    
+    LogProcessorWarn("standard devaiation: " << standardDeviation); //standard devaiation : 16.5052
+
+    //stretching factor
+    double stretchingFactor = propDesiredStandardDeviation / standardDeviation;
+
+    //recolor
+    for (size_t j = 0; j < texDims_.y; j++) {
+        for (size_t i = 0; i < texDims_.x; i++) {
+            if (!licImage.readPixel(size2_t(i, j)).x == 0) {
+                int currentPixel = licImage.readPixel(size2_t(i, j)).x - mean;
+                int newVal = propDesiredMean + stretchingFactor * (currentPixel - mean);
+                licImage.setPixel(size2_t(i, j), dvec4(newVal, newVal, newVal, 255));
+            }
+        }
+    }
+
+
     // TODO contrast enhancement?
 
     licOut_.setData(outImage);
