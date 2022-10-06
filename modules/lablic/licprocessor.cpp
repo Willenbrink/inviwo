@@ -39,7 +39,7 @@ LICProcessor::LICProcessor()
     , propUseFastLic("useFastLic", "Use FastLIC", true)
     , propDesiredMean("DesiredMean", "Desired Mean", 0.5, 0, 1)
     , propDesiredStandardDeviation("DesiredStandardDeviation", "Desired Standard Deviation", 0.1, 0, 1)
-    , propKernelSize("kernelSize", "Kernel Size", 5, 1, 200, 1)
+    , propKernelSize("kernelSize", "Kernel Size", 5, 0, 200)
     , propColor("color", "Color", false)
 
 {
@@ -112,11 +112,11 @@ void LICProcessor::process() {
         // return vec2((int) point.x, (int) point.y);
     };
     auto sampleNoise = [&](dvec2 point) {
-        return texture.sample(vectorToPoint(point));
+        return texture.sample(vectorToPoint(point)).x;
     };
 
     auto LIC = [&](dvec2 startPoint) {
-        std::vector<dvec4> samples;
+        std::vector<double> samples;
         dvec2 currentPoint = startPoint;
         samples.push_back(sampleNoise(currentPoint));
         for (int i = 0; i < propKernelSize; i++) {
@@ -146,7 +146,7 @@ void LICProcessor::process() {
     std::vector<std::vector<int>> visited(texDims_.x, std::vector<int>(texDims_.y, 0));
 
     int maxSteps = 500;
-    auto integrate = [&](dvec2 currentPoint, std::vector<vec2> &points, vec2 texPoint, bool forward) {
+    auto integrate = [&](dvec2 currentPoint, std::vector<dvec2> &points, vec2 texPoint, bool forward) {
         for (int steps = 0;; steps++) {
             dvec2 newPoint = Integrator::RK4_norm(vectorField, currentPoint, propStepSize, forward);
             // Stop integrating at the borders or if stuck in a loop
@@ -157,26 +157,27 @@ void LICProcessor::process() {
 
             vec2 newTexPoint = vectorToPoint(currentPoint);
             if(newTexPoint == texPoint) {
+                LogProcessorInfo("Loop detected");
                 return true;
             }
-            points.push_back(newTexPoint);
+            points.push_back(currentPoint);
         }
         return false;
     };
 
     int kernelSize = propKernelSize;
     auto fastLIC = [&](dvec2 startPoint) {
-        std::vector<vec2> points;
+        std::vector<dvec2> points;
         vec2 texPoint = vectorToPoint(startPoint);
         if(visited[texPoint.x][texPoint.y]) {
             return;
         }
-        points.push_back(texPoint);
+        points.push_back(startPoint);
 
         bool loop = integrate(startPoint, points, texPoint, false);
         std::reverse(points.begin(), points.end());
         if(!loop) {
-            texPoint = points[0];
+            texPoint = vectorToPoint(points[0]);
             loop = integrate(startPoint, points, texPoint, true);
         }
 
@@ -187,38 +188,59 @@ void LICProcessor::process() {
         // int -> optional int to encode weird loop behaviour
         // Normally the first pixel uses only half a kernel
         // In loops it uses a full kernel
-        auto getVal = [&](int i) -> std::optional<int> {
+        auto getVal = [&](int i) {
             if((i >= 0 && i < len) || loop) {
                 // Because % is not the modulo operator if negative
-                return (i + len * kernelSize) % len;
+                return (i + len * maxSteps) % len;
             }
-            return {};
+            return -1;
         };
-        //Precompute kernel for the first pixel
-        for(int i = -kernelSize - 1; i < kernelSize + 1; i++) {
-            auto ind = getVal(i);
-            if(ind.has_value()) {
-                vec2 point = points[ind.value()];
-                sum += texture.sample(point).x;
-                count++;
+        if(kernelSize >= 50) {
+            //Precompute kernel for the first pixel
+            for(int i = -kernelSize - 1; i < kernelSize; i++) {
+                int ind = getVal(i);
+                if(ind != -1) {
+                    dvec2 point = points[ind];
+                    sum += sampleNoise(point);
+                    count++;
+                }
             }
-        }
-        // Slide it along the points
-        for(int i = 0; i < len; i++) {
-            auto ind = getVal(i + kernelSize + 1);
-            if(ind.has_value()) {
-                vec2 point = points[ind.value()];
-                sum += texture.sample(point).x;
-                count++;
+            // Slide it along the points
+            for(int i = 0; i < len; i++) {
+                int ind = getVal(i + kernelSize);
+                if(ind != -1) {
+                    dvec2 point = points[ind];
+                    sum += sampleNoise(point);
+                    count++;
+                }
+                ind = getVal(i - kernelSize - 1);
+                if(ind != -1) {
+                    dvec2 point = points[ind];
+                    sum -= sampleNoise(point);
+                    count--;
+                }
+                vec2 point = vectorToPoint(points[i]);
+                if(point.x < texDims_.x && point.y < texDims_.y)
+                    visited[point.x][point.y] = sum / std::max(1,count);
             }
-            ind = getVal(i - kernelSize - 1);
-            if(ind.has_value()) {
-                vec2 point = points[ind.value()];
-                sum -= texture.sample(point).x;
-                count--;
+        } else {
+            // Slide it along the points
+            for(int i = 0; i < len; i++) {
+                sum = 0;
+                count = 0;
+                for(int j = -kernelSize; j < kernelSize + 1; j++) {
+                    int ind = getVal(i+j);
+                    if(ind != -1) {
+                        dvec2 point = points[ind];
+                        sum += sampleNoise(point);
+                        count++;
+                    }
+                }
+                vec2 point = vectorToPoint(points[i]);
+                if(point.x < texDims_.x && point.y < texDims_.y)
+                    visited[point.x][point.y] = sum / std::max(1,count);
+
             }
-            vec2 point = points[i];
-            visited[point.x][point.y] = sum / count;
         }
     };
 
@@ -233,7 +255,7 @@ void LICProcessor::process() {
                 auto samples = LIC(point);
                 int len = samples.size();
                 for(int c = 0; c < len; c++) {
-                    val += samples[c].x;
+                    val += samples[c];
                 }
                 if(len)
                     val = val / len;
