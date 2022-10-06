@@ -37,8 +37,11 @@ LICProcessor::LICProcessor()
     , propUseContrastEnhancement("useContrastEnhancement", "Use Contrast Enhancement", false)
     , propUseFastLic("useFastLic", "Use FastLIC", false)
     , propDesiredMean("DesiredMean", "Desired Mean", 255 / 2, 0, 255)
-    , propDesiredStandardDeviation("DesiredStandardDeviation", "Desired Standard Deviation", 25, 0, 255)
+    , propDesiredStandardDeviation("DesiredStandardDeviation", "Desired Standard Deviation", 25, 0,
+                                   255)
     , propKernelSize("kernelSize", "Kernel Size", 5, 1, 200, 1)
+    , propColor("color", "Color", false)
+
 {
     // Register ports
     addPort(volumeIn_);
@@ -55,6 +58,7 @@ LICProcessor::LICProcessor()
     addProperty(propDesiredMean);
     addProperty(propDesiredStandardDeviation);
     addProperty(propUseFastLic);
+    addProperty(propColor);
     
     
 
@@ -221,14 +225,14 @@ void LICProcessor::process() {
     double standardDeviation = sqrt(variance);
 
     
-    LogProcessorWarn("mean: " << mean); //mean: 126
+   // LogProcessorWarn("mean: " << mean); //mean: 126
     
-    LogProcessorWarn("standard devaiation: " << standardDeviation); //standard devaiation : 16.5052
+    //LogProcessorWarn("standard devaiation: " << standardDeviation); //standard devaiation : 16.5052
 
     //stretching factor
     double stretchingFactor = propDesiredStandardDeviation / standardDeviation;
 
-    //recolor
+    //re"color"
     for (size_t j = 0; j < texDims_.y; j++) {
         for (size_t i = 0; i < texDims_.x; i++) {
             if (!licImage.readPixel(size2_t(i, j)).x == 0) {
@@ -238,6 +242,36 @@ void LICProcessor::process() {
             }
         }
     }
+
+    //add colors depending on velocity of vector
+    if (propColor) {     
+        dvec2 scale = dvec2(diff.x / texDims_.x, diff.y / texDims_.y);
+        for (size_t j = 0; j < texDims_.y; j++) {                                  
+            for (size_t i = 0; i < texDims_.x; i++) {
+                dvec2 point = BBoxMin_ + dvec2(i * scale.x, j * scale.y);
+                dvec2 vec = vectorField.interpolate(point);
+                double val = glm::length(vec) * 175;
+                int r, g, b;
+                if (val < 128) { //it will be on the scale from red to green
+                    r = 255 - 2 * val;
+                    g = 2 * val;
+                    b = 0;
+                } else { //it will be on the scale from green to blue
+                    val = val - 128;
+                    r = 0;
+                    g = 255 - 2 * val;
+                    b = 2 * val;
+                }
+                int original = licImage.readPixel(size2_t(i, j)).x *0.4;
+
+                licImage.setPixel(dvec2(i, j), dvec4(0.5 * b + original, 0.5 * g + original, 0.5 * r + original, 255)); //blue and red are swapped to look like the lecture video
+                //licImage.setPixel(dvec2(i, j), dvec4(b, g, r, 255));
+                //licImage.setPixel(dvec2(i, j), dvec4(std::min(b, original), std::min(g, original), std::min(r, original), 255));
+            }
+        }
+    }
+   
+
 
 
     // TODO contrast enhancement?

@@ -82,6 +82,7 @@ public:
     FloatProperty propDesiredStandardDeviation;
     
     IntProperty propKernelSize;
+    BoolProperty propColor;
     // IntProperty prop1;
     // BoolProperty prop2;
 
