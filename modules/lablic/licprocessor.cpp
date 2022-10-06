@@ -110,15 +110,15 @@ void LICProcessor::process() {
 
     std::vector<std::vector<double>> licTexture(texDims_.x, std::vector<double>(texDims_.y, 0.0));
 
-    // Hint: Output an image showing which pixels you have visited for debugging
-    std::vector<std::vector<int>> visited(texDims_.x, std::vector<int>(texDims_.y, 0));
-
     // TODO: Implement LIC and FastLIC
     // This code instead sets all pixels to the same gray value
-    auto sampleNoise = [&](dvec2 point) {
+    auto vectorToPoint = [&](dvec2 point) {
         point -= BBoxMin_;
         point = dvec2(point.x / scale.x, point.y / scale.y);
-        return texture.sample(point);
+        return point;
+    };
+    auto sampleNoise = [&](dvec2 point) {
+        return texture.sample(vectorToPoint(point));
     };
 
     auto LIC = [&](dvec2 startPoint) {
@@ -126,8 +126,7 @@ void LICProcessor::process() {
         dvec2 currentPoint = startPoint;
         samples.push_back(sampleNoise(currentPoint));
         for (int i = 0; i < propKernelSize; i++) {
-            // TODO use normalized RK4. Works but which approach should we use?
-            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, propStepSize, 1);
+            dvec2 newPoint = Integrator::RK4_norm(vectorField, currentPoint, propStepSize, 1);
             if (!vectorField.isInside(newPoint)) {
                 break;
             }
@@ -137,7 +136,7 @@ void LICProcessor::process() {
         }
         currentPoint = startPoint;
         for (int i = 0; i < propKernelSize; i++) {
-            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, propStepSize, 0);
+            dvec2 newPoint = Integrator::RK4_norm(vectorField, currentPoint, propStepSize, 0);
             if (!vectorField.isInside(newPoint)) {
                 break;
             }
@@ -148,46 +147,90 @@ void LICProcessor::process() {
         return samples;
     };
 
-    std::map<dvec2, std::vector<dvec2>> linesMap;
+    // Hint: Output an image showing which pixels you have visited for debugging
+    std::vector<std::vector<int>> visited(texDims_.x, std::vector<int>(texDims_.y, 0));
     auto fastLIC = [&](dvec2 startPoint) {
-        std::vector<dvec4> samples;
+        int kernelSize = propKernelSize;
+        int maxSteps = 100000;
+        std::vector<vec2> points;
         dvec2 currentPoint = startPoint;
-        samples.push_back(sampleNoise(currentPoint));
-        for (int i = 0; i < propKernelSize; i++) {
-            // TODO use normalized RK4. Works but which approach should we use?
-            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, propStepSize, 1);
-            if (!vectorField.isInside(newPoint)) {
+        vec2 texPoint = vectorToPoint(currentPoint);
+        if(visited[texPoint.x][texPoint.y]) {
+            return;
+        }
+        points.push_back(texPoint);
+        for (int steps = 0;; steps++) {
+            // TODO rk4_norm broken?
+            dvec2 newPoint = Integrator::RK4_norm(vectorField, currentPoint, propStepSize, 1);
+            if (!vectorField.isInside(newPoint) || steps >= maxSteps) {
                 break;
+            }
+            dvec2 movement = newPoint - currentPoint;
+            if(glm::length(movement) < 0.0001) {
+                return;
             }
             currentPoint = newPoint;
 
-            samples.push_back(sampleNoise(currentPoint));
+            points.push_back(vectorToPoint(currentPoint));
         }
         currentPoint = startPoint;
-        for (int i = 0; i < propKernelSize; i++) {
-            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, propStepSize, 0);
-            if (!vectorField.isInside(newPoint)) {
+        std::reverse(points.begin(), points.end());
+        for (int steps = 0;; steps++) {
+            dvec2 newPoint = Integrator::RK4_norm(vectorField, currentPoint, propStepSize, 0);
+            if (!vectorField.isInside(newPoint) || steps >= maxSteps) {
                 break;
+            }
+            dvec2 movement = newPoint - currentPoint;
+            if(glm::length(movement) < 0.0001) {
+                return;
             }
             currentPoint = newPoint;
 
-            samples.push_back(sampleNoise(currentPoint));
+            points.push_back(vectorToPoint(currentPoint));
         }
-        return samples;
+        int len = points.size();
+        int sum = 0;
+        int count = 0;
+        //Precompute kernel for the first pixel
+        for(int i = 0; i < kernelSize && i < len; i++) {
+            vec2 point = points[i];
+            sum += texture.sample(point).x;
+            count++;
+        }
+        // Slide it along the points
+        for(int i = 0; i < len; i++) {
+            if(i + kernelSize < len) {
+                vec2 point = points[i+kernelSize];
+                sum += texture.sample(point).x;
+                count++;
+            }
+            vec2 point = points[i];
+            visited[point.x][point.y] = sum / count;
+            if(i - kernelSize >= 0) {
+                vec2 point = points[i-kernelSize];
+                sum -= texture.sample(point).x;
+                count--;
+            }
+        }
     };
 
     for (size_t j = 0; j < texDims_.y; j++) {
         for (size_t i = 0; i < texDims_.x; i++) {
             dvec2 point = BBoxMin_ + dvec2(i * scale.x, j * scale.y);
             //TODO user-defined kernel-size
-            auto samples = LIC(point);
             int val = 0;
-            int len = samples.size();
-            for (int c = 0; c < len; c++) {
-                val += samples[c].x;
+            if(0) {
+                auto samples = LIC(point, 25);
+                int len = samples.size();
+                for(int c = 0; c < len; c++) {
+                    val += samples[c].x;
+                }
+                if(len)
+                    val = val / len;
+            } else {
+                fastLIC(point,25);
+                val = visited[i][j];
             }
-            if (len)
-                val = val / len;
 
             // int val = int(texture.readPixelGrayScale(size2_t(i, j)));
             licImage.setPixel(size2_t(i, j), dvec4(val, val, val, 255));
