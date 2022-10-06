@@ -30,6 +30,7 @@ NoiseTextureGenerator::NoiseTextureGenerator()
     , texSize_("texSize", "Texture Size", vec2(512, 512), vec2(1, 1), vec2(2048, 2048), vec2(1, 1))
 // TODO: Register additional properties
 , propGrayScale("grayScale", "Texture generation type")
+, propRandomSeed("randomSeed", "Random seed", 500, 0, 1000)
 {
     // Register ports
     addPort(texOut_);
@@ -39,11 +40,15 @@ NoiseTextureGenerator::NoiseTextureGenerator()
     propGrayScale.addOption("grayScale", "Grayscale", 1);
     propGrayScale.addOption("blackWhite", "Black-white", 0);
     addProperty(propGrayScale);
+    addProperty(propRandomSeed);
 
-    // TODO: Register additional properties
+    // TODO: Register additional propertiesRandom seed
 }
 
 void NoiseTextureGenerator::process() {
+
+    srand(propRandomSeed);
+    
     // The output of the generation process is an Image
     // With the given dimensions
     // With the data format DataVec4UInt8, this means values for RGB-alpha range between 0 and 255

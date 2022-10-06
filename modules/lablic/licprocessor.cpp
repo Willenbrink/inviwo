@@ -33,17 +33,12 @@ LICProcessor::LICProcessor()
     , volumeIn_("volIn")
     , noiseTexIn_("noiseTexIn")
     , licOut_("licOut")
-    , propMaxSteps("maxSteps", "Max Steps", 5, 0, 1000)
     , propStepSize("stepSize", "Step size", 0.01, 0, 1)
     , propUseContrastEnhancement("useContrastEnhancement", "Use Contrast Enhancement", false)
     , propUseFastLic("useFastLic", "Use FastLIC", false)
     , propDesiredMean("DesiredMean", "Desired Mean", 255 / 2, 0, 255)
     , propDesiredStandardDeviation("DesiredStandardDeviation", "Desired Standard Deviation", 25, 0, 255)
-, propRandomSeed("randomSeed", "Random seed", 500, 0, 1000)
-
-
-// TODO: Register additional properties
-    , propKernelSize("kernelSize", "Kernel Size", 50, 1, 200, 1)
+    , propKernelSize("kernelSize", "Kernel Size", 5, 1, 200, 1)
 {
     // Register ports
     addPort(volumeIn_);
@@ -55,14 +50,12 @@ LICProcessor::LICProcessor()
     addProperty(propKernelSize);
     
     
-
-    addProperty(propMaxSteps);
     addProperty(propStepSize);
     addProperty(propUseContrastEnhancement);
     addProperty(propDesiredMean);
     addProperty(propDesiredStandardDeviation);
     addProperty(propUseFastLic);
-    addProperty(propRandomSeed);
+    
     
 
     util::hide(propDesiredMean);
@@ -128,7 +121,7 @@ void LICProcessor::process() {
         std::vector<dvec4> samples;
         dvec2 currentPoint = startPoint;
         samples.push_back(sampleNoise(currentPoint));
-        for (int i = 0; i < propMaxSteps; i++) {
+        for (int i = 0; i < propKernelSize; i++) {
             // TODO use normalized RK4. Works but which approach should we use?
             dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, propStepSize, 1);
             if (!vectorField.isInside(newPoint)) {
@@ -139,7 +132,7 @@ void LICProcessor::process() {
             samples.push_back(sampleNoise(currentPoint));
         }
         currentPoint = startPoint;
-        for (int i = 0; i < propMaxSteps; i++) {
+        for (int i = 0; i < propKernelSize; i++) {
             dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, propStepSize, 0);
             if (!vectorField.isInside(newPoint)) {
                 break;
@@ -156,7 +149,7 @@ void LICProcessor::process() {
         std::vector<dvec4> samples;
         dvec2 currentPoint = startPoint;
         samples.push_back(sampleNoise(currentPoint));
-        for (int i = 0; i < propMaxSteps; i++) {
+        for (int i = 0; i < propKernelSize; i++) {
             // TODO use normalized RK4. Works but which approach should we use?
             dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, propStepSize, 1);
             if (!vectorField.isInside(newPoint)) {
@@ -167,7 +160,7 @@ void LICProcessor::process() {
             samples.push_back(sampleNoise(currentPoint));
         }
         currentPoint = startPoint;
-        for (int i = 0; i < propMaxSteps; i++) {
+        for (int i = 0; i < propKernelSize; i++) {
             dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, propStepSize, 0);
             if (!vectorField.isInside(newPoint)) {
                 break;
@@ -183,7 +176,7 @@ void LICProcessor::process() {
         for (size_t i = 0; i < texDims_.x; i++) {
             dvec2 point = BBoxMin_ + dvec2(i * scale.x, j * scale.y);
             //TODO user-defined kernel-size
-            auto samples = LIC(point, propKernelSize);
+            auto samples = LIC(point);
             int val = 0;
             int len = samples.size();
             for (int c = 0; c < len; c++) {

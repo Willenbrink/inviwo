@@ -60,6 +60,7 @@ public:
     // IntProperty properyName;
     // TemplateOptionProperty<int> propertyName2;
     TemplateOptionProperty<int> propGrayScale;
+    IntProperty propRandomSeed;
 
     // Attributes
 private:

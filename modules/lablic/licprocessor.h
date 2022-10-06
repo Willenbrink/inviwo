@@ -75,13 +75,12 @@ public:
     // Properties
 public:
     // TODO: Declare properties
-    IntProperty propMaxSteps;
     DoubleProperty propStepSize;
     BoolProperty propUseFastLic;
     BoolProperty propUseContrastEnhancement;
     IntProperty propDesiredMean;
     FloatProperty propDesiredStandardDeviation;
-    IntProperty propRandomSeed;
+    
     IntProperty propKernelSize;
     // IntProperty prop1;
     // BoolProperty prop2;
