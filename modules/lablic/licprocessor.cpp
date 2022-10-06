@@ -82,25 +82,20 @@ void LICProcessor::process() {
 
     // TODO: Implement LIC and FastLIC
     // This code instead sets all pixels to the same gray value
-    int breaks = 0, fails = 0;
     auto sampleNoise = [&](dvec2 point) {
         point -= BBoxMin_;
         point = dvec2(point.x / scale.x, point.y / scale.y);
         return texture.sample(point);
     };
 
-    auto calcStreamline = [this, &sampleNoise, &breaks, &fails, &scale, &texture, &vectorField](dvec2 startPoint, int maxSteps) {
+    auto LIC = [&](dvec2 startPoint, int maxSteps) {
         std::vector<dvec4> samples;
         dvec2 currentPoint = startPoint;
-        if(!vectorField.isInside(currentPoint)) {
-            fails++;
-            return samples;
-        }
         samples.push_back(sampleNoise(currentPoint));
         for (int i = 0; i < maxSteps; i++) {
-            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 0.01, 1);
+            // TODO use normalized RK4. Works but which approach should we use?
+            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 0.001, 1);
             if (!vectorField.isInside(newPoint)) {
-                breaks++;
                 break;
             }
             currentPoint = newPoint;
@@ -109,9 +104,36 @@ void LICProcessor::process() {
         }
         currentPoint = startPoint;
         for (int i = 0; i < maxSteps; i++) {
-            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 0.01, 0);
+            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 0.001, 0);
             if (!vectorField.isInside(newPoint)) {
-                breaks++;
+                break;
+            }
+            currentPoint = newPoint;
+
+            samples.push_back(sampleNoise(currentPoint));
+        }
+        return samples;
+    };
+
+    std::map<dvec2,std::vector<dvec2>> linesMap;
+    auto fastLIC = [&](dvec2 startPoint, int maxSteps) {
+        std::vector<dvec4> samples;
+        dvec2 currentPoint = startPoint;
+        samples.push_back(sampleNoise(currentPoint));
+        for (int i = 0; i < maxSteps; i++) {
+            // TODO use normalized RK4. Works but which approach should we use?
+            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 0.001, 1);
+            if (!vectorField.isInside(newPoint)) {
+                break;
+            }
+            currentPoint = newPoint;
+
+            samples.push_back(sampleNoise(currentPoint));
+        }
+        currentPoint = startPoint;
+        for (int i = 0; i < maxSteps; i++) {
+            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 0.001, 0);
+            if (!vectorField.isInside(newPoint)) {
                 break;
             }
             currentPoint = newPoint;
@@ -124,7 +146,8 @@ void LICProcessor::process() {
     for (size_t j = 0; j < texDims_.y; j++) {
         for (size_t i = 0; i < texDims_.x; i++) {
             dvec2 point = BBoxMin_ + dvec2(i * scale.x, j * scale.y);
-            auto samples = calcStreamline(point, 5);
+            //TODO user-defined kernel-size
+            auto samples = LIC(point, 50);
             int val = 0;
             int len = samples.size();
             for(int c = 0; c < len; c++) {
@@ -139,10 +162,8 @@ void LICProcessor::process() {
             // licImage.setPixelGrayScale(size2_t(i, j), val);
         }
     }
-    LogProcessorInfo("Fails");
-    LogProcessorInfo(fails);
-    LogProcessorInfo("Breaks");
-    LogProcessorInfo(breaks);
+
+    // TODO contrast enhancement?
 
     licOut_.setData(outImage);
 }
