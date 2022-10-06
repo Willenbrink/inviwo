@@ -148,6 +148,7 @@ void LICProcessor::process() {
     };
 
     // Hint: Output an image showing which pixels you have visited for debugging
+    // Contains the final pixel values
     std::vector<std::vector<int>> visited(texDims_.x, std::vector<int>(texDims_.y, 0));
     auto fastLIC = [&](dvec2 startPoint) {
         int kernelSize = propKernelSize;
@@ -155,17 +156,20 @@ void LICProcessor::process() {
         std::vector<vec2> points;
         dvec2 currentPoint = startPoint;
         vec2 texPoint = vectorToPoint(currentPoint);
+        // Don't recompute
         if(visited[texPoint.x][texPoint.y]) {
             return;
         }
         points.push_back(texPoint);
+        // Forward
         for (int steps = 0;; steps++) {
-            // TODO rk4_norm broken?
             dvec2 newPoint = Integrator::RK4_norm(vectorField, currentPoint, propStepSize, 1);
+            // Stop integrating at the borders or if stuck in a loop
             if (!vectorField.isInside(newPoint) || steps >= maxSteps) {
                 break;
             }
             dvec2 movement = newPoint - currentPoint;
+            // Avoid areas in cylinder
             if(glm::length(movement) < 0.0001) {
                 return;
             }
@@ -175,6 +179,7 @@ void LICProcessor::process() {
         }
         currentPoint = startPoint;
         std::reverse(points.begin(), points.end());
+        // Backward
         for (int steps = 0;; steps++) {
             dvec2 newPoint = Integrator::RK4_norm(vectorField, currentPoint, propStepSize, 0);
             if (!vectorField.isInside(newPoint) || steps >= maxSteps) {
@@ -188,6 +193,8 @@ void LICProcessor::process() {
 
             points.push_back(vectorToPoint(currentPoint));
         }
+
+        // Convolute
         int len = points.size();
         int sum = 0;
         int count = 0;
