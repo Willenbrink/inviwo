@@ -83,46 +83,48 @@ void LICProcessor::process() {
     // TODO: Implement LIC and FastLIC
     // This code instead sets all pixels to the same gray value
     int breaks = 0, fails = 0;
-    auto calcStreamline = [this, &breaks, &fails, &scale, &texture, &vectorField](dvec2 startPoint, int maxSteps) {
+    auto sampleNoise = [&](dvec2 point) {
+        point -= BBoxMin_;
+        point = dvec2(point.x / scale.x, point.y / scale.y);
+        return texture.sample(point);
+    };
+
+    auto calcStreamline = [this, &sampleNoise, &breaks, &fails, &scale, &texture, &vectorField](dvec2 startPoint, int maxSteps) {
         std::vector<dvec4> samples;
         dvec2 currentPoint = startPoint;
         if(!vectorField.isInside(currentPoint)) {
             fails++;
             return samples;
         }
-        dvec4 value = texture.sample(dvec2(currentPoint.x / scale.x, currentPoint.y / scale.y));
-        samples.push_back(value);
+        samples.push_back(sampleNoise(currentPoint));
         for (int i = 0; i < maxSteps; i++) {
-            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 0.1, 1);
+            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 0.01, 1);
             if (!vectorField.isInside(newPoint)) {
                 breaks++;
                 break;
             }
             currentPoint = newPoint;
 
-            dvec4 value = texture.sample(dvec2(currentPoint.x / scale.x, currentPoint.y / scale.y));
-            samples.push_back(value);
+            samples.push_back(sampleNoise(currentPoint));
         }
         currentPoint = startPoint;
-        std::reverse(samples.begin(), samples.end());
         for (int i = 0; i < maxSteps; i++) {
-            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 0.1, 0);
+            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 0.01, 0);
             if (!vectorField.isInside(newPoint)) {
                 breaks++;
                 break;
             }
             currentPoint = newPoint;
 
-            dvec4 value = texture.sample(dvec2(currentPoint.x / scale.x, currentPoint.y / scale.y));
-            samples.push_back(value);
+            samples.push_back(sampleNoise(currentPoint));
         }
         return samples;
     };
 
     for (size_t j = 0; j < texDims_.y; j++) {
         for (size_t i = 0; i < texDims_.x; i++) {
-            auto point = BBoxMin_ + dvec2(i * scale.x, j * scale.y);
-            auto samples = calcStreamline(point, 2);
+            dvec2 point = BBoxMin_ + dvec2(i * scale.x, j * scale.y);
+            auto samples = calcStreamline(point, 5);
             int val = 0;
             int len = samples.size();
             for(int c = 0; c < len; c++) {
