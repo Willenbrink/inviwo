@@ -107,7 +107,9 @@ void LICProcessor::process() {
     auto vectorToPoint = [&](dvec2 point) {
         point -= BBoxMin_;
         point = dvec2(point.x / scale.x, point.y / scale.y);
-        return vec2((int) point.x, (int) point.y);
+        // return point;
+        return vec2(point.x, point.y);
+        // return vec2((int) point.x, (int) point.y);
     };
     auto sampleNoise = [&](dvec2 point) {
         return texture.sample(vectorToPoint(point));
@@ -142,74 +144,76 @@ void LICProcessor::process() {
     // Hint: Output an image showing which pixels you have visited for debugging
     // Contains the final pixel values
     std::vector<std::vector<int>> visited(texDims_.x, std::vector<int>(texDims_.y, 0));
-    auto fastLIC = [&](dvec2 startPoint) {
-        int kernelSize = propKernelSize;
-        int maxSteps = 1000;
-        std::vector<vec2> points;
-        dvec2 currentPoint = startPoint;
-        vec2 texPoint = vectorToPoint(currentPoint);
-        // Don't recompute
-        if(visited[texPoint.x][texPoint.y]) {
-            return;
-        }
-        points.push_back(texPoint);
-        // Forward
+
+    int maxSteps = 500;
+    auto integrate = [&](dvec2 currentPoint, std::vector<vec2> &points, vec2 texPoint, bool forward) {
         for (int steps = 0;; steps++) {
-            dvec2 newPoint = Integrator::RK4_norm(vectorField, currentPoint, propStepSize, 1);
+            dvec2 newPoint = Integrator::RK4_norm(vectorField, currentPoint, propStepSize, forward);
             // Stop integrating at the borders or if stuck in a loop
             if (!vectorField.isInside(newPoint) || steps >= maxSteps) {
                 break;
             }
-            dvec2 movement = newPoint - currentPoint;
-            // Avoid areas in cylinder
-            dvec2 v1 = vectorField.interpolate(newPoint);
-            // if(v1.x + v1.y < DBL_EPSILON) {
-            // if(glm::length(movement) < 0.0000001) {
-            //     break;
-            //     // return;
-            // }
             currentPoint = newPoint;
 
-            points.push_back(vectorToPoint(currentPoint));
-        }
-        currentPoint = startPoint;
-        std::reverse(points.begin(), points.end());
-        // Backward
-        for (int steps = 0;; steps++) {
-            dvec2 newPoint = Integrator::RK4_norm(vectorField, currentPoint, propStepSize, 0);
-            if (!vectorField.isInside(newPoint) || steps >= maxSteps) {
-                break;
+            vec2 newTexPoint = vectorToPoint(currentPoint);
+            if(newTexPoint == texPoint) {
+                return true;
             }
-            dvec2 movement = newPoint - currentPoint;
-            dvec2 v1 = vectorField.interpolate(newPoint);
-            // if(v1.x + v1.y < DBL_EPSILON) {
-            //     break;
-            //     // return;
-            // }
-            currentPoint = newPoint;
+            points.push_back(newTexPoint);
+        }
+        return false;
+    };
 
-            points.push_back(vectorToPoint(currentPoint));
+    int kernelSize = propKernelSize;
+    auto fastLIC = [&](dvec2 startPoint) {
+        std::vector<vec2> points;
+        vec2 texPoint = vectorToPoint(startPoint);
+        if(visited[texPoint.x][texPoint.y]) {
+            return;
+        }
+        points.push_back(texPoint);
+
+        bool loop = integrate(startPoint, points, texPoint, false);
+        std::reverse(points.begin(), points.end());
+        if(!loop) {
+            texPoint = points[0];
+            loop = integrate(startPoint, points, texPoint, true);
         }
 
         // Convolute
         int len = points.size();
         int sum = 0;
         int count = 0;
+        // int -> optional int to encode weird loop behaviour
+        // Normally the first pixel uses only half a kernel
+        // In loops it uses a full kernel
+        auto getVal = [&](int i) -> std::optional<int> {
+            if((i >= 0 && i < len) || loop) {
+                // Because % is not the modulo operator if negative
+                return (i + len * kernelSize) % len;
+            }
+            return {};
+        };
         //Precompute kernel for the first pixel
-        for(int i = 0; i < kernelSize && i < len; i++) {
-            vec2 point = points[i];
-            sum += texture.sample(point).x;
-            count++;
-        }
-        // Slide it along the points
-        for(int i = 0; i < len; i++) {
-            if(i + kernelSize < len) {
-                vec2 point = points[i+kernelSize];
+        for(int i = -kernelSize - 1; i < kernelSize + 1; i++) {
+            auto ind = getVal(i);
+            if(ind.has_value()) {
+                vec2 point = points[ind.value()];
                 sum += texture.sample(point).x;
                 count++;
             }
-            if(i - kernelSize >= 0) {
-                vec2 point = points[i-kernelSize];
+        }
+        // Slide it along the points
+        for(int i = 0; i < len; i++) {
+            auto ind = getVal(i + kernelSize + 1);
+            if(ind.has_value()) {
+                vec2 point = points[ind.value()];
+                sum += texture.sample(point).x;
+                count++;
+            }
+            ind = getVal(i - kernelSize - 1);
+            if(ind.has_value()) {
+                vec2 point = points[ind.value()];
                 sum -= texture.sample(point).x;
                 count--;
             }
