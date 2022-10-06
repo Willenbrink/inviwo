@@ -152,7 +152,7 @@ void LICProcessor::process() {
     std::vector<std::vector<int>> visited(texDims_.x, std::vector<int>(texDims_.y, 0));
     auto fastLIC = [&](dvec2 startPoint) {
         int kernelSize = propKernelSize;
-        int maxSteps = 100000;
+        int maxSteps = 1000;
         std::vector<vec2> points;
         dvec2 currentPoint = startPoint;
         vec2 texPoint = vectorToPoint(currentPoint);
@@ -170,9 +170,12 @@ void LICProcessor::process() {
             }
             dvec2 movement = newPoint - currentPoint;
             // Avoid areas in cylinder
-            if(glm::length(movement) < 0.0001) {
-                return;
-            }
+            dvec2 v1 = vectorField.interpolate(newPoint);
+            // if(v1.x + v1.y < DBL_EPSILON) {
+            // if(glm::length(movement) < 0.0000001) {
+            //     break;
+            //     // return;
+            // }
             currentPoint = newPoint;
 
             points.push_back(vectorToPoint(currentPoint));
@@ -186,9 +189,11 @@ void LICProcessor::process() {
                 break;
             }
             dvec2 movement = newPoint - currentPoint;
-            if(glm::length(movement) < 0.0001) {
-                return;
-            }
+            dvec2 v1 = vectorField.interpolate(newPoint);
+            // if(v1.x + v1.y < DBL_EPSILON) {
+            //     break;
+            //     // return;
+            // }
             currentPoint = newPoint;
 
             points.push_back(vectorToPoint(currentPoint));
@@ -211,13 +216,13 @@ void LICProcessor::process() {
                 sum += texture.sample(point).x;
                 count++;
             }
-            vec2 point = points[i];
-            visited[point.x][point.y] = sum / count;
             if(i - kernelSize >= 0) {
                 vec2 point = points[i-kernelSize];
                 sum -= texture.sample(point).x;
                 count--;
             }
+            vec2 point = points[i];
+            visited[point.x][point.y] = sum / count;
         }
     };
 

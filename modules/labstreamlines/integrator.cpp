@@ -37,6 +37,30 @@ dvec2 Integrator::RK4(const VectorField2& vectorField, const dvec2& position,
     return position + movement;
 }
 
+dvec2 Integrator::RK4_norm(const VectorField2& vectorField, const dvec2& position,
+                      const double stepSize, const bool forwards) {
+    auto norm = [&](dvec2 in) {
+        double eucl = in.x * in.x + in.y * in.y;
+        if(eucl > 0)
+            return dvec2(in.x * sqrt(eucl), in.y * sqrt(eucl));
+        return in;
+    };
+    dvec2 v1 = norm(vectorField.interpolate(position));
+    dvec2 v2 = norm(vectorField.interpolate(
+        position + dvec2(v1.x * (stepSize / 2), v1.y * (stepSize / 2))));
+    dvec2 v3 = norm(vectorField.interpolate(
+        position + dvec2(v2.x * (stepSize / 2), v2.y * (stepSize / 2))));
+    dvec2 v4 = norm(vectorField.interpolate(position + dvec2(v3.x * stepSize, v3.y * stepSize)));
+    dvec2 finalDirection = v1 / 6 + v2 / 3 + v3 / 3 + v4 / 6;
+    dvec2 movement;
+    if (forwards)
+        movement = dvec2(finalDirection.x * stepSize, finalDirection.y * stepSize);
+    else
+        movement = dvec2(finalDirection.x * stepSize * -1, finalDirection.y * stepSize * -1);
+
+    return position + movement;
+}
+
 
 void Integrator::drawPoint(const dvec2& p, const vec4& color, IndexBufferRAM* indexBuffer,
                            std::vector<BasicMesh::Vertex>& vertices) {
