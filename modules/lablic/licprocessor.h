@@ -82,6 +82,7 @@ public:
     IntProperty propDesiredMean;
     FloatProperty propDesiredStandardDeviation;
     IntProperty propRandomSeed;
+    IntProperty propKernelSize;
     // IntProperty prop1;
     // BoolProperty prop2;
 
