@@ -9,6 +9,7 @@
  */
 
 #include <inviwo/core/datastructures/volume/volumeram.h>
+#include <inviwo/core/util/utilities.h>
 #include <lablic/licprocessor.h>
 #include <labstreamlines/integrator.h>
 
@@ -33,12 +34,11 @@ LICProcessor::LICProcessor()
     , volumeIn_("volIn")
     , noiseTexIn_("noiseTexIn")
     , licOut_("licOut")
-    , propStepSize("stepSize", "Step size", 0.01, 0, 1)
+    , propStepSize("stepSize", "Step size", 0.001, 0, 1)
     , propUseContrastEnhancement("useContrastEnhancement", "Use Contrast Enhancement", false)
-    , propUseFastLic("useFastLic", "Use FastLIC", false)
-    , propDesiredMean("DesiredMean", "Desired Mean", 255 / 2, 0, 255)
-    , propDesiredStandardDeviation("DesiredStandardDeviation", "Desired Standard Deviation", 25, 0,
-                                   255)
+    , propUseFastLic("useFastLic", "Use FastLIC", true)
+    , propDesiredMean("DesiredMean", "Desired Mean", 0.5, 0, 1)
+    , propDesiredStandardDeviation("DesiredStandardDeviation", "Desired Standard Deviation", 0.1, 0, 1)
     , propKernelSize("kernelSize", "Kernel Size", 5, 1, 200, 1)
     , propColor("color", "Color", false)
 
@@ -49,7 +49,6 @@ LICProcessor::LICProcessor()
     addPort(licOut_);
 
     // Register properties
-    // TODO: Register additional properties
     addProperty(propKernelSize);
     
     
@@ -60,8 +59,6 @@ LICProcessor::LICProcessor()
     addProperty(propUseFastLic);
     addProperty(propColor);
     
-    
-
     util::hide(propDesiredMean);
     util::hide(propDesiredStandardDeviation);
 
@@ -100,22 +97,17 @@ void LICProcessor::process() {
     // Scale of tex to vectorfield
     auto scale = dvec2(diff.x / texDims_.x, diff.y / texDims_.y);
 
-    double value = texture.readPixelGrayScale(size2_t(0, 0));
-
-    LogProcessorInfo(value);
-
     // Prepare the output, it has the same dimensions as the texture and rgba values in [0,255]
     auto outImage = std::make_shared<Image>(texDims_, DataVec4UInt8::get());
     RGBAImage licImage(outImage);
 
     std::vector<std::vector<double>> licTexture(texDims_.x, std::vector<double>(texDims_.y, 0.0));
 
-    // TODO: Implement LIC and FastLIC
     // This code instead sets all pixels to the same gray value
     auto vectorToPoint = [&](dvec2 point) {
         point -= BBoxMin_;
         point = dvec2(point.x / scale.x, point.y / scale.y);
-        return point;
+        return vec2((int) point.x, (int) point.y);
     };
     auto sampleNoise = [&](dvec2 point) {
         return texture.sample(vectorToPoint(point));
@@ -229,19 +221,18 @@ void LICProcessor::process() {
     for (size_t j = 0; j < texDims_.y; j++) {
         for (size_t i = 0; i < texDims_.x; i++) {
             dvec2 point = BBoxMin_ + dvec2(i * scale.x, j * scale.y);
-            //TODO user-defined kernel-size
             int val = 0;
-            if(0) {
-                auto samples = LIC(point, 25);
+            if(propUseFastLic) {
+                fastLIC(point);
+                val = visited[i][j];
+            } else {
+                auto samples = LIC(point);
                 int len = samples.size();
                 for(int c = 0; c < len; c++) {
                     val += samples[c].x;
                 }
                 if(len)
                     val = val / len;
-            } else {
-                fastLIC(point,25);
-                val = visited[i][j];
             }
 
             // int val = int(texture.readPixelGrayScale(size2_t(i, j)));
@@ -285,7 +276,7 @@ void LICProcessor::process() {
     //LogProcessorWarn("standard devaiation: " << standardDeviation); //standard devaiation : 16.5052
 
     //stretching factor
-    double stretchingFactor = propDesiredStandardDeviation / standardDeviation;
+    double stretchingFactor = (propDesiredStandardDeviation * 256) / standardDeviation;
 
     //re"color"
     for (size_t j = 0; j < texDims_.y; j++) {

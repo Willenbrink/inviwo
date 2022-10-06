@@ -76,9 +76,9 @@ public:
 public:
     // TODO: Declare properties
     DoubleProperty propStepSize;
-    BoolProperty propUseFastLic;
     BoolProperty propUseContrastEnhancement;
-    IntProperty propDesiredMean;
+    BoolProperty propUseFastLic;
+    FloatProperty propDesiredMean;
     FloatProperty propDesiredStandardDeviation;
     
     IntProperty propKernelSize;
