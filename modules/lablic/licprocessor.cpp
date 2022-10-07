@@ -145,8 +145,8 @@ void LICProcessor::process() {
     // Contains the final pixel values
     std::vector<std::vector<int>> visited(texDims_.x, std::vector<int>(texDims_.y, 0));
 
-    int maxSteps = 500;
-    auto integrate = [&](dvec2 currentPoint, std::vector<dvec2> &points, vec2 texPoint, bool forward) {
+    int maxSteps = 5000;
+    auto getStreamLine = [&](dvec2 currentPoint, std::vector<dvec2> &points, vec2 texPoint, bool forward) {
         for (int steps = 0;; steps++) {
             dvec2 newPoint = Integrator::RK4_norm(vectorField, currentPoint, propStepSize, forward);
             // Stop integrating at the borders or if stuck in a loop
@@ -174,72 +174,106 @@ void LICProcessor::process() {
         }
         points.push_back(startPoint);
 
-        bool loop = integrate(startPoint, points, texPoint, false);
+        bool loop = getStreamLine(startPoint, points, texPoint, false);
         std::reverse(points.begin(), points.end());
         if(!loop) {
             texPoint = vectorToPoint(points[0]);
-            loop = integrate(startPoint, points, texPoint, true);
+            loop = getStreamLine(startPoint, points, texPoint, true);
         }
 
         // Convolute
-        int len = points.size();
-        int sum = 0;
+        int streamLineLenght = points.size();
+        double sum = 0;
         int count = 0;
+        int leftIndex = 0;
+        int rightIndex = kernelSize;
         // int -> optional int to encode weird loop behaviour
         // Normally the first pixel uses only half a kernel
         // In loops it uses a full kernel
         auto getVal = [&](int i) {
-            if((i >= 0 && i < len) || loop) {
+            if((i >= 0 && i < streamLineLenght) || loop) {
                 // Because % is not the modulo operator if negative
-                return (i + len * maxSteps) % len;
+                return (i + streamLineLenght * maxSteps) % streamLineLenght;
             }
             return -1;
         };
-        if(kernelSize >= 50) {
+        if(true) {
             //Precompute kernel for the first pixel
-            for(int i = -kernelSize - 1; i < kernelSize; i++) {
-                int ind = getVal(i);
-                if(ind != -1) {
-                    dvec2 point = points[ind];
-                    sum += sampleNoise(point);
-                    count++;
-                }
-            }
+            // for(int i = -kernelSize - 1; i < kernelSize; i++) {
+            //     int ind = getVal(i);
+            //     if(ind != -1) {
+            //         dvec2 point = points[ind];
+            //         sum += sampleNoise(point);
+            //         count++;
+            //     }
+            // }
             // Slide it along the points
-            for(int i = 0; i < len; i++) {
-                int ind = getVal(i + kernelSize);
-                if(ind != -1) {
-                    dvec2 point = points[ind];
-                    sum += sampleNoise(point);
-                    count++;
-                }
-                ind = getVal(i - kernelSize - 1);
-                if(ind != -1) {
-                    dvec2 point = points[ind];
-                    sum -= sampleNoise(point);
+            for(int pointIndex = 0; pointIndex < streamLineLenght; pointIndex++) {
+                // int ind = getVal(pointIndex + kernelSize);
+                // if(ind != -1) {
+                //     dvec2 point = points[ind];
+                //     sum += sampleNoise(point);
+                //     count++;
+                // }
+                // ind = getVal(pointIndex - kernelSize - 1);
+                // if(ind != -1) {
+                //     dvec2 point = points[ind];
+                //     sum -= sampleNoise(point);
+                //     count--;
+                // }
+                
+                if (rightIndex >= streamLineLenght - 1) {
+                    sum -= sampleNoise(points[leftIndex]);
                     count--;
+                    leftIndex++;
+                } else if (rightIndex - leftIndex < kernelSize * 2) {
+                    sum += sampleNoise(points[rightIndex]);
+                    count++;
+                    rightIndex++;
+                } else  {
+                    sum -= sampleNoise(points[leftIndex]);
+                    sum += sampleNoise(points[rightIndex]);
+                    leftIndex++;
+                    rightIndex++;
                 }
-                vec2 point = vectorToPoint(points[i]);
-                if(point.x < texDims_.x && point.y < texDims_.y)
+                
+                vec2 point = vectorToPoint(points[pointIndex]);
+                if(point.x < texDims_.x && point.y < texDims_.y && !visited[point.x][point.y])
                     visited[point.x][point.y] = sum / std::max(1,count);
             }
         } else {
             // Slide it along the points
-            for(int i = 0; i < len; i++) {
+            for(int pointIndex = 0; pointIndex < streamLineLenght; pointIndex++) {
                 sum = 0;
                 count = 0;
-                for(int j = -kernelSize; j < kernelSize + 1; j++) {
-                    int ind = getVal(i+j);
-                    if(ind != -1) {
-                        dvec2 point = points[ind];
-                        sum += sampleNoise(point);
-                        count++;
-                    }
+                if (leftIndex == rightIndex) {
+                    break;
                 }
-                vec2 point = vectorToPoint(points[i]);
+                for(int j = leftIndex; j < rightIndex; j++) {
+                    
+                    // int ind = getVal(i+j);
+                    // if(ind != -1) {
+                    //     dvec2 point = points[ind];
+                    //     sum += sampleNoise(point);
+                    //     count++;
+                    // }
+                    dvec2 point = points[j];
+                    sum += sampleNoise(point);
+                    count++;
+                }
+                
+                vec2 point = vectorToPoint(points[pointIndex]);
                 if(point.x < texDims_.x && point.y < texDims_.y)
                     visited[point.x][point.y] = sum / std::max(1,count);
-
+                
+                if (rightIndex - leftIndex < kernelSize * 2) {
+                    rightIndex++;
+                } else if (rightIndex >= streamLineLenght - 1 ) {
+                    leftIndex++;
+                } else {
+                    leftIndex++;
+                    rightIndex++;
+                }
             }
         }
     };
