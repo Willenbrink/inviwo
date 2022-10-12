@@ -14,6 +14,7 @@
 #include <labtopo/utils/gradients.h>
 #include <cstddef>
 #include <optional>
+#include "utils/gradients.h"
 
 namespace inviwo {
 
@@ -43,6 +44,7 @@ Topology::Topology()
     , outMesh("meshOut")
     , meshBBoxOut("meshBBoxOut")
 // TODO: Initialize additional properties
+    , thresholdProp("tresh", "Center Treshold", 0.5, 0, 1)
 // propertyName("propertyIdentifier", "Display Name of the Propery",
 // default value (optional), minimum value (optional), maximum value (optional), increment
 // (optional)); propertyIdentifier cannot have spaces
@@ -51,6 +53,7 @@ Topology::Topology()
     addPort(outMesh);
     addPort(inData);
     addPort(meshBBoxOut);
+    addProperty(thresholdProp);
 
     // TODO: Register additional properties
     // addProperty(propertyName);
@@ -118,8 +121,8 @@ void Topology::process() {
     };
 
     // lower left, upper right, lower right, upper left
-    std::function<std::optional<dvec2>(dvec2, dvec2, int)> decomposition;
-    decomposition = [&](dvec2 lowerLeft, dvec2 upperRight, int depth) -> std::optional<dvec2> {
+    std::function<std::optional<dvec2>(dvec2, dvec2)> decomposition;
+    decomposition = [&](dvec2 lowerLeft, dvec2 upperRight) -> std::optional<dvec2> {
         dvec2 upperLeft = dvec2(lowerLeft.x, upperRight.y);
         dvec2 lowerRight = dvec2(upperRight.x, lowerLeft.y);
 
@@ -146,13 +149,13 @@ void Topology::process() {
         dvec2 diff = upperRight - lowerLeft;
         dvec2 center = dvec2(lowerLeft.x + diff.x / 2, lowerLeft.y + diff.y / 2);
         // point(center, vec4(0,20,0,255));
-        if( depth == 0 ) {
+        if( std::abs(diff.x) <= 4*FLT_EPSILON && std::abs(diff.y) <= 4*FLT_EPSILON ) {
             return std::optional<dvec2>(center);
         }
-        auto lowerLeft_dec = decomposition(lowerLeft, center, depth - 1);
-        auto upperLeft_dec = decomposition(upperLeft, center, depth - 1);
-        auto lowerRight_dec = decomposition(lowerRight, center, depth - 1);
-        auto upperRight_dec = decomposition(upperRight, center, depth - 1);
+        auto lowerLeft_dec = decomposition(lowerLeft, center);
+        auto upperLeft_dec = decomposition(upperLeft, center);
+        auto lowerRight_dec = decomposition(lowerRight, center);
+        auto upperRight_dec = decomposition(upperRight, center);
         if(lowerLeft_dec.has_value()) {
             return lowerLeft_dec;
         }
@@ -173,10 +176,42 @@ void Topology::process() {
         for (size_t i = 0; i < dims[0]; ++i) {
             dvec2 ll = to_tex(dvec2(i,j));
             dvec2 ur = to_tex(dvec2(i+1,j+1));
-            auto zero = decomposition(ll, ur, 10);
+            auto zero = decomposition(ll, ur);
             if (zero.has_value())
             {
-                point(zero.value(), vec4(0,255,0,255));
+                dvec2 crit = zero.value();
+                vec4 color = vec4(1,1,1,1);
+                mat2 jacobian = vectorField.derive(crit);
+                double det = jacobian[0][0] * jacobian[1][1] - jacobian[1][0] * jacobian[0][1];
+                if(det == 0) {
+                    continue;
+                }
+                util::EigenResult eigen = util::eigenAnalysis(jacobian);
+                vec2 real = eigen.eigenvaluesRe;
+                vec2 img = eigen.eigenvaluesIm;
+
+                if(std::abs(img.x) <= 4*FLT_EPSILON && std::abs(img.y) <= 4*FLT_EPSILON) {
+                    if(real.x > 0 && real.y > 0) {
+                        color = ColorsCP[(int) TypeCP::RepellingNode];
+                    }
+                    if(real.x < 0 && real.y < 0) {
+                        color = ColorsCP[(int) TypeCP::AttractingNode];
+                    }
+                    if(real.x * real.y < 0) {
+                        color = ColorsCP[(int) TypeCP::Saddle];
+                    }
+                } else {
+                    if(real.x > 0 && real.y > 0) {
+                        color = ColorsCP[(int) TypeCP::RepellingFocus];
+                    }
+                    if(real.x < 0 && real.y < 0) {
+                        color = ColorsCP[(int) TypeCP::AttractingFocus];
+                    }
+                    if(std::abs(real.x) <= thresholdProp && std::abs(real.y) <= thresholdProp) {
+                        color = ColorsCP[(int) TypeCP::Center];
+                    }
+                }
+                point(crit, color);
             }
         }
     }

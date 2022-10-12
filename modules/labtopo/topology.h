@@ -63,6 +63,7 @@ public:
 public:
     virtual const ProcessorInfo getProcessorInfo() const override;
     static const ProcessorInfo processorInfo_;
+    DoubleProperty thresholdProp;
 
 protected:
     // Our main computation function
