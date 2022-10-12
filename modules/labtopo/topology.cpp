@@ -44,7 +44,8 @@ Topology::Topology()
     , outMesh("meshOut")
     , meshBBoxOut("meshBBoxOut")
 // TODO: Initialize additional properties
-    , thresholdProp("tresh", "Center Treshold", 0.5, 0, 1)
+    , thresholdProp("tresh", "Center Treshold", 0.0001, 0, 1)
+    , stepsProp("steps", "Number of Steps", 1000, 0, 10000)
 // propertyName("propertyIdentifier", "Display Name of the Propery",
 // default value (optional), minimum value (optional), maximum value (optional), increment
 // (optional)); propertyIdentifier cannot have spaces
@@ -54,6 +55,7 @@ Topology::Topology()
     addPort(inData);
     addPort(meshBBoxOut);
     addProperty(thresholdProp);
+    addProperty(stepsProp);
 
     // TODO: Register additional properties
     // addProperty(propertyName);
@@ -171,6 +173,29 @@ void Topology::process() {
         return std::nullopt;
     };
 
+    auto calcStreamline = [&](vec2 startPoint, bool forward) {
+        dvec2 currentPoint = startPoint;
+        double arcLength = 0;
+        int i = 0;
+        for (; i < stepsProp; i++) {
+            dvec2 newPoint = Integrator::RK4(vectorField, currentPoint, 0.01, forward);
+            dvec2 movement = newPoint - currentPoint;
+            if (!vectorField.isInside(newPoint)) {
+                break;
+            }
+            double distance = sqrt((newPoint.x - currentPoint.x) * (newPoint.x - currentPoint.x) +
+                                   (newPoint.y - currentPoint.y) * (newPoint.y - currentPoint.y));
+            arcLength += distance;
+            drawLineSegment(currentPoint, newPoint, vec4(1,1,1,1), indexBufferSeparatrices.get(), vertices);
+            currentPoint = newPoint;
+
+            dvec2 value = vectorField.interpolate(currentPoint);
+            if (std::abs(value.x) < FLT_EPSILON && std::abs(value.y) < FLT_EPSILON) {
+                break;
+            }
+        }
+    };
+
     // Looping through all values in the vector field.
     for (size_t j = 0; j < dims[1]; ++j) {
         for (size_t i = 0; i < dims[0]; ++i) {
@@ -199,6 +224,13 @@ void Topology::process() {
                     }
                     if(real.x * real.y < 0) {
                         color = ColorsCP[(int) TypeCP::Saddle];
+                        mat2 eig_vec = eigen.eigenvectors;
+                        dvec2 v1 = dvec2(eig_vec[0][0], eig_vec[0][1]);
+                        dvec2 v2 = dvec2(eig_vec[1][0], eig_vec[1][1]);
+                        calcStreamline(crit + v1 * 0.001, (real.x > 0));
+                        calcStreamline(crit - v1 * 0.001, (real.x > 0));
+                        calcStreamline(crit + v2 * 0.001, (real.y > 0));
+                        calcStreamline(crit - v2 * 0.001, (real.y > 0));
                     }
                 } else {
                     if(real.x > 0 && real.y > 0) {
