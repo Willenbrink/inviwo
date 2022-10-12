@@ -12,6 +12,8 @@
 #include <labutils/scalarvectorfield.h>
 #include <labtopo/topology.h>
 #include <labtopo/utils/gradients.h>
+#include <cstddef>
+#include <optional>
 
 namespace inviwo {
 
@@ -110,16 +112,72 @@ void Topology::process() {
     // Integrate all separatrices.
 
     auto point = [&](dvec2 v, vec4 color) {
-        v = to_tex(v);
         // drawLineSegment(start, end, color, indexBufferPoints.get(), vertices);
         indexBufferPoints->add(static_cast<std::uint32_t>(vertices.size()));
-        vertices.push_back({vec3(v[0], v[1], 0), vec3(0, 0, 1), vec3(v[0], v[1], 0), color});
+        vertices.push_back({dvec3(v[0], v[1], 0), dvec3(0, 0, 1), dvec3(v[0], v[1], 0), color});
+    };
+
+    // lower left, upper right, lower right, upper left
+    std::function<std::optional<dvec2>(dvec2, dvec2, int)> decomposition;
+    decomposition = [&](dvec2 lowerLeft, dvec2 upperRight, int depth) -> std::optional<dvec2> {
+        dvec2 upperLeft = dvec2(lowerLeft.x, upperRight.y);
+        dvec2 lowerRight = dvec2(upperRight.x, lowerLeft.y);
+
+        dvec2 lowerLeft_v = vectorField.interpolate(lowerLeft);
+        dvec2 upperLeft_v = vectorField.interpolate(upperLeft);
+        dvec2 lowerRight_v = vectorField.interpolate(lowerRight);
+        dvec2 upperRight_v = vectorField.interpolate(upperRight);
+
+        int x_pos_num = 0
+            + (lowerLeft_v.x > 0)
+            + (upperLeft_v.x > 0)
+            + (lowerRight_v.x > 0)
+            + (upperRight_v.x > 0)
+            ;
+        int y_pos_num = 0
+            + (lowerLeft_v.y > 0)
+            + (upperLeft_v.y > 0)
+            + (lowerRight_v.y > 0)
+            + (upperRight_v.y > 0)
+            ;
+        if( (x_pos_num == 0 || x_pos_num == 4) || (y_pos_num == 0 || y_pos_num == 4) ) {
+            return std::nullopt;
+        }
+        dvec2 diff = upperRight - lowerLeft;
+        dvec2 center = dvec2(lowerLeft.x + diff.x / 2, lowerLeft.y + diff.y / 2);
+        // point(center, vec4(0,20,0,255));
+        if( depth == 0 ) {
+            return std::optional<dvec2>(center);
+        }
+        auto lowerLeft_dec = decomposition(lowerLeft, center, depth - 1);
+        auto upperLeft_dec = decomposition(upperLeft, center, depth - 1);
+        auto lowerRight_dec = decomposition(lowerRight, center, depth - 1);
+        auto upperRight_dec = decomposition(upperRight, center, depth - 1);
+        if(lowerLeft_dec.has_value()) {
+            return lowerLeft_dec;
+        }
+        if(upperLeft_dec.has_value()) {
+            return upperLeft_dec;
+        }
+        if(lowerRight_dec.has_value()) {
+            return lowerRight_dec;
+        }
+        if(upperRight_dec.has_value()) {
+            return upperRight_dec;
+        }
+        return std::nullopt;
     };
 
     // Looping through all values in the vector field.
     for (size_t j = 0; j < dims[1]; ++j) {
         for (size_t i = 0; i < dims[0]; ++i) {
-            dvec2 vectorValue = vectorField.getValueAtVertex(size2_t(i, j));
+            dvec2 ll = to_tex(dvec2(i,j));
+            dvec2 ur = to_tex(dvec2(i+1,j+1));
+            auto zero = decomposition(ll, ur, 10);
+            if (zero.has_value())
+            {
+                point(zero.value(), vec4(0,255,0,255));
+            }
         }
     }
 
