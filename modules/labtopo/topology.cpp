@@ -207,3 +207,24 @@ void Topology::drawLineSegment(const dvec2& v1, const dvec2& v2, const vec4& col
 }
 
 }  // namespace inviwo
+
+/*
+
+a)
+X = y + 3
+Y = -x + 5
+
+b)
+X = x + 2
+Y = -(y - 7) = -y + 7
+
+
+c)
+X = (y + 3) * (x + 2)
+Y = (-x + 5) * (-y + 7)
+
+d)
+X = sin(y)
+Y = cos(x)
+
+*/
