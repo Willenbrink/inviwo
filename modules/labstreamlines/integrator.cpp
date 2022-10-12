@@ -45,13 +45,13 @@ dvec2 Integrator::RK4_norm(const VectorField2& vectorField, const dvec2& positio
             return dvec2(in.x * sqrt(eucl), in.y * sqrt(eucl));
         return in;
     };
-    dvec2 v1 = norm(vectorField.interpolate(position));
-    dvec2 v2 = norm(vectorField.interpolate(
+    dvec2 v1 = (vectorField.interpolate(position));
+    dvec2 v2 = (vectorField.interpolate(
         position + dvec2(v1.x * (stepSize / 2), v1.y * (stepSize / 2))));
-    dvec2 v3 = norm(vectorField.interpolate(
+    dvec2 v3 = (vectorField.interpolate(
         position + dvec2(v2.x * (stepSize / 2), v2.y * (stepSize / 2))));
-    dvec2 v4 = norm(vectorField.interpolate(position + dvec2(v3.x * stepSize, v3.y * stepSize)));
-    dvec2 finalDirection = v1 / 6 + v2 / 3 + v3 / 3 + v4 / 6;
+    dvec2 v4 = (vectorField.interpolate(position + dvec2(v3.x * stepSize, v3.y * stepSize)));
+    dvec2 finalDirection = norm(v1) / 6 + norm(v2) / 3 + norm(v3) / 3 + norm(v4) / 6;
     dvec2 movement;
     if (forwards)
         movement = dvec2(finalDirection.x * stepSize, finalDirection.y * stepSize);
