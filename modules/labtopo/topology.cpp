@@ -83,6 +83,17 @@ void Topology::process() {
     bboxMesh->addVertices(bboxVertices);
     meshBBoxOut.setData(bboxMesh);
 
+    size2_t dims = vectorField.getNumVerticesPerDim();
+    auto diff = BBoxMax - BBoxMin;
+    auto scale = dvec2(diff.x / dims.x, diff.y / dims.y);
+    auto to_tex = [&](dvec2 point) {
+        return dvec2(point.x * scale.x, point.y * scale.y) + BBoxMin;
+    };
+    auto to_vector = [&](dvec2 point) {
+        point -= BBoxMin;
+        return dvec2(point.x / scale.x, point.y / scale.y);
+    };
+
     // Initialize mesh, vertices and index buffers for seperatrices
     auto mesh = std::make_shared<BasicMesh>();
     std::vector<BasicMesh::Vertex> vertices;
@@ -98,7 +109,12 @@ void Topology::process() {
     // Find the critical points and color them according to their type.
     // Integrate all separatrices.
 
-    size2_t dims = vectorField.getNumVerticesPerDim();
+    auto point = [&](dvec2 v, vec4 color) {
+        v = to_tex(v);
+        // drawLineSegment(start, end, color, indexBufferPoints.get(), vertices);
+        indexBufferPoints->add(static_cast<std::uint32_t>(vertices.size()));
+        vertices.push_back({vec3(v[0], v[1], 0), vec3(0, 0, 1), vec3(v[0], v[1], 0), color});
+    };
 
     // Looping through all values in the vector field.
     for (size_t j = 0; j < dims[1]; ++j) {
