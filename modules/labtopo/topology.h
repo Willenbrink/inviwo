@@ -48,11 +48,12 @@ public:
         RepellingNode = 2,
         AttractingFocus = 3,
         RepellingFocus = 4,
-        Center = 5
+        Center = 5,
+        Border = 6
     };
 
     // Colors according to the TypeCP enum.
-    static const vec4 ColorsCP[6];
+    static const vec4 ColorsCP[7];
 
     // Construction / Deconstruction
 public:

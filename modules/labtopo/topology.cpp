@@ -18,13 +18,14 @@
 
 namespace inviwo {
 
-const vec4 Topology::ColorsCP[6] = {
+const vec4 Topology::ColorsCP[7] = {
     vec4(1, 1, 0, 1),    // Saddle - Yellow
     vec4(1, 0, 0, 1),    // AttractingNode - Red
     vec4(0, 0, 1, 1),    // RepellingNode - Blue
     vec4(0.5, 0, 1, 1),  // AttractingFocus - Purple
     vec4(1, 0.5, 0, 1),  // RepellingFocus - Orange
-    vec4(0, 1, 0, 1)     // Center - Green
+    vec4(0, 1, 0, 1),    // Center - Green
+    vec4(0, 0, 0, 1)     // Border - Black
 };
 
 // The Class Identifier has to be globally unique. Use a reverse DNS naming scheme
@@ -60,6 +61,51 @@ Topology::Topology()
     // TODO: Register additional properties
     // addProperty(propertyName);
 }
+
+void calcBorderSwitchPoints(dvec2 start, dvec2 end, function<bool(dvec2)> isPointingInside,
+                            function<bool(dvec2)> foundBorder, int maxIterations,
+                            function<void(dvec2, vec4)> point, function<void(dvec2, bool)> drawStreamline) {
+    if (maxIterations <= 0) {
+        point(start, Topology::ColorsCP[(int) Topology::TypeCP::Border]);
+        drawStreamline(start, true);
+        drawStreamline(start, false);
+        return;
+    }
+    if (isPointingInside(start) == isPointingInside(end)) {
+        return;
+    }
+    if (foundBorder(start)) {
+        // draw
+        point(start, Topology::ColorsCP[(int) Topology::TypeCP::Border]);
+        drawStreamline(start, true);
+        drawStreamline(start, false);
+        return;
+    } else if (foundBorder(end)) {
+        // draw
+        point(end, Topology::ColorsCP[(int) Topology::TypeCP::Border]);
+        drawStreamline(start, true);
+        drawStreamline(start, false);
+        return;
+    }
+
+    auto center = dvec2((start.x + end.x) / 2, (start.y + end.y) / 2);
+    // point(center, Topology::ColorsCP[(int) Topology::TypeCP::Border]);
+    
+    if (foundBorder(center)) {
+        //draw
+        point(center, Topology::ColorsCP[(int) Topology::TypeCP::Border]);
+        drawStreamline(start, true);
+        drawStreamline(start, false);
+        return;
+    }
+
+    if (isPointingInside(start) != isPointingInside(center)) {
+        // start to center
+        calcBorderSwitchPoints(start, center, isPointingInside, foundBorder, maxIterations - 1, point, drawStreamline);
+    } else if (isPointingInside(center) != isPointingInside(end)) {
+        calcBorderSwitchPoints(center, end, isPointingInside, foundBorder, maxIterations - 1, point, drawStreamline);
+    }
+};
 
 void Topology::process() {
     // Get input
@@ -173,6 +219,8 @@ void Topology::process() {
         return std::nullopt;
     };
 
+    
+
     auto calcStreamline = [&](vec2 startPoint, bool forward) {
         dvec2 currentPoint = startPoint;
         double arcLength = 0;
@@ -248,6 +296,112 @@ void Topology::process() {
         }
     }
 
+    // Looping through the boundaries in the vector field
+    
+
+    auto isPointingLeft = [&](dvec2 location) {
+        return vectorField.interpolate(location).x < 0;
+    };
+    auto isPointingRight = [&](dvec2 location) {
+        return vectorField.interpolate(location).x > 0;
+    };
+    auto isPointingDown = [&](dvec2 location) {
+        return vectorField.interpolate(location).y < 0;
+    };
+    auto isPointingUp = [&](dvec2 location) {
+        return vectorField.interpolate(location).y > 0;
+    };
+    auto xIsZero = [&](dvec2 location) {
+        return abs(vectorField.interpolate(location).x) < FLT_EPSILON;
+    };
+    auto yIsZero = [&](dvec2 location) {
+        return abs(vectorField.interpolate(location).y) < FLT_EPSILON;
+    };
+    
+    dvec2 bottomLeft = to_tex(dvec2(0, 0));
+    dvec2 bottomRight = to_tex(dvec2(dims[0], 0));
+    dvec2 topLeft = to_tex(dvec2(0, dims[1]));
+    dvec2 topRight = to_tex(dvec2(dims[0], dims[1]));
+    double yDiff = topLeft.y - bottomLeft.y;
+    double xDiff = bottomRight.x - bottomLeft.x;
+    int maxIterations = 20;
+    int amountOfSteps = 10;
+
+    // bottom left to bottom right
+    double y = bottomLeft.y;
+    auto lastLocation = bottomLeft;
+    auto lastPointingInside = isPointingUp(lastLocation);
+    for (double x = topLeft.x; x <= topRight.x; x += xDiff / amountOfSteps) {
+        auto location = dvec2(x, y);
+        auto value = vectorField.interpolate(location);
+        auto pointingInside = isPointingUp(location);
+
+        if (lastPointingInside != pointingInside) {
+            calcBorderSwitchPoints(lastLocation, location, isPointingUp, xIsZero, maxIterations, point, calcStreamline);
+        }
+
+        lastPointingInside = pointingInside;
+        lastLocation = location;
+    }
+
+    // top left to top right
+    y = topLeft.y;
+    lastLocation = topLeft;
+    lastPointingInside = isPointingDown(lastLocation);
+    for (double x = topLeft.x; x <= topRight.x; x += xDiff / amountOfSteps) {
+        auto location = dvec2(x,y);
+        auto value = vectorField.interpolate(location);
+        auto pointingInside = isPointingDown(location);
+        // LogProcessorWarn("At " << location.x << " Vector is pointing inside: " << pointingInside)
+        
+        if (lastPointingInside != pointingInside) {
+            
+            // point(location, ColorsCP[(int) Topology::TypeCP::Border] );
+            calcBorderSwitchPoints(lastLocation, location, isPointingDown, xIsZero, maxIterations, point, calcStreamline);
+        }
+        lastPointingInside = pointingInside;
+        lastLocation = location;
+    }
+
+    // bottom left to top left
+    double x = bottomLeft.x;
+    lastLocation = bottomLeft;
+    lastPointingInside = isPointingRight(lastLocation);
+    for (double y = bottomLeft.y; y <= topLeft.y; y += yDiff / amountOfSteps) {
+        auto location = dvec2(x, y);
+        auto value = vectorField.interpolate(location);
+        auto pointingInside = isPointingRight(location);
+        LogProcessorWarn("At " << location.x << ", " << location.y << " Vector is pointing inside: " << pointingInside)
+        // point(location, Topology::ColorsCP[(int) Topology::TypeCP::Border]);
+        
+        if (lastPointingInside != pointingInside) {
+            
+            // point(location, ColorsCP[(int) Topology::TypeCP::Border] );
+            calcBorderSwitchPoints(lastLocation, location, isPointingRight, yIsZero, maxIterations, point, calcStreamline);
+        }
+        lastPointingInside = pointingInside;
+        lastLocation = location;
+    }
+
+    // bottom right to top right
+    x = bottomLeft.x;
+    lastLocation = bottomLeft;
+    lastPointingInside = isPointingLeft(lastLocation);
+    for (double y = bottomRight.y; y <= topRight.y; y += yDiff / amountOfSteps) {
+        auto location = dvec2(x,y);
+        auto value = vectorField.interpolate(location);
+        auto pointingInside = isPointingLeft(location);
+        // LogProcessorWarn("At " << location.x << " Vector is pointing inside: " << pointingInside)
+        
+        if (lastPointingInside != pointingInside) {
+            
+            // point(location, ColorsCP[(int) Topology::TypeCP::Border] );
+            calcBorderSwitchPoints(lastLocation, location, isPointingLeft, yIsZero, maxIterations, point, calcStreamline);
+        }
+        lastPointingInside = pointingInside;
+        lastLocation = location;
+    }
+    
     // Other helpful functions
     // dvec2 pos = vectorField.getPositionAtVertex(size2_t(i, j));
     // Computing the jacobian at a position
@@ -258,7 +412,7 @@ void Topology::process() {
     // eigenvectors
 
     // Accessing the colors
-    vec4 colorCenter = ColorsCP[static_cast<int>(TypeCP::Center)];
+    // vec4 colorCenter = ColorsCP[static_cast<int>(TypeCP::Center)];
 
     mesh->addVertices(vertices);
     outMesh.setData(mesh);
@@ -277,21 +431,21 @@ void Topology::drawLineSegment(const dvec2& v1, const dvec2& v2, const vec4& col
 
 /*
 
-a)
-X = y + 3
-Y = -x + 5
+    a)
+    X = y + 3
+    Y = -x + 5
 
-b)
-X = x + 2
-Y = -(y - 7) = -y + 7
+    b)
+    X = x + 2
+    Y = -(y - 7) = -y + 7
 
 
-c)
-X = (y + 3) * (x + 2)
-Y = (-x + 5) * (-y + 7)
+    c)
+    X = (y + 3) * (x + 2)
+    Y = (-x + 5) * (-y + 7)
 
-d)
-X = sin(y)
-Y = cos(x)
+    d)
+    X = sin(y)
+    Y = cos(x)
 
 */
